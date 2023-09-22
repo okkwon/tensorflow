@@ -54,7 +54,8 @@ class IreeDelegate : public SimpleDelegateInterface {
   bool IsNodeSupportedByDelegate(const TfLiteRegistration* registration,
                                  const TfLiteNode* node,
                                  TfLiteContext* context) const override {
-    return options_.allowed_builtin_code == registration->builtin_code;
+    // TODO: implement
+    return false;
   }
 
   TfLiteStatus Initialize(TfLiteContext* context) override { return kTfLiteOk; }
@@ -92,7 +93,8 @@ TfLiteIreeDelegateOptions TfLiteIreeDelegateOptionsDefault() {
 // Creates a new delegate instance that need to be destroyed with
 // `TfLiteIreeDelegateDelete` when delegate is no longer used by TFLite.
 // When `options` is set to `nullptr`, the above default values are used:
-TfLiteDelegate* TfLiteIreeDelegateCreate(const TfLiteIreeDelegateOptions* options) {
+TfLiteDelegate* TfLiteIreeDelegateCreate(
+    const TfLiteIreeDelegateOptions* options) {
   std::unique_ptr<tflite::iree_test::IreeDelegate> iree(
       new tflite::iree_test::IreeDelegate(
           options ? *options : TfLiteIreeDelegateOptionsDefault()));
