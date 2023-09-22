@@ -70,21 +70,17 @@ void IreeDelegateProvider::LogParams(const ToolParams& params,
 
 TfLiteDelegatePtr IreeDelegateProvider::CreateTfLiteDelegate(
     const ToolParams& params) const {
-  TfLiteDelegatePtr delegate = CreateNullDelegate();
-  if (params.Get<bool>("use_iree")) {
-    TfLiteIreeDelegateOptions options = {0};
-    // options.print_graph_profile = params.Get<bool>("iree_profiling");
-    // options.max_delegated_partitions =
-    //     params.Get<int>("max_delegated_partitions");
-    // options.min_nodes_per_partition =
-    //     params.Get<int>("min_nodes_per_partition");
-    delegate = evaluation::CreateIreeDelegate(&options);
+  TfLiteIreeDelegateOptions options = {0};
+  // options.print_graph_profile = params.Get<bool>("iree_profiling");
+  // options.max_delegated_partitions =
+  //     params.Get<int>("max_delegated_partitions");
+  // options.min_nodes_per_partition =
+  TfLiteDelegatePtr delegate = evaluation::CreateIreeDelegate(&options);
 
-    if (!delegate.get()) {
-      TFLITE_LOG(WARN)
-          << "Could not create Iree delegate: platform may not support "
-             "delegate or required libraries are missing";
-    }
+  if (!delegate.get()) {
+    TFLITE_LOG(WARN)
+        << "Could not create Iree delegate: platform may not support "
+            "delegate or required libraries are missing";
   }
   return delegate;
 }
