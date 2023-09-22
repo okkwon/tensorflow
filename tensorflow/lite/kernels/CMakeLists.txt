@@ -65,6 +65,8 @@ set(DELEGATE_PROVIDERS_SUPP
   ${TFLITE_SOURCE_DIR}/nnapi/sl/SupportLibrary.cc
   ${TFLITE_SOURCE_DIR}/tools/delegates/delegate_provider.cc
   ${TFLITE_SOURCE_DIR}/tools/evaluation/utils.cc
+  ${TFLITE_SOURCE_DIR}/delegates/iree/iree_delegate.cc
+  ${TFLITE_SOURCE_DIR}/delegates/utils/simple_delegate.cc
 )
 
 set(DELEGATE_PROVIDERS
@@ -72,6 +74,7 @@ set(DELEGATE_PROVIDERS
   ${TFLITE_SOURCE_DIR}/tools/delegates/default_execution_provider.cc
   # List of delegates referenced as options in the tensorflow/lite/CMakeLists.txt
   ${TFLITE_SOURCE_DIR}/tools/delegates/gpu_delegate_provider.cc
+  ${TFLITE_SOURCE_DIR}/tools/delegates/iree_delegate_provider.cc
   ${TFLITE_SOURCE_DIR}/tools/delegates/nnapi_delegate_provider.cc
   ${TFLITE_SOURCE_DIR}/tools/delegates/xnnpack_delegate_provider.cc
 )
