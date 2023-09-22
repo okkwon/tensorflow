@@ -71,6 +71,7 @@ option(TFLITE_ENABLE_MMAP "Enable MMAP (unsupported on Windows)" ON)
 option(TFLITE_ENABLE_GPU "Enable GPU" OFF)
 option(TFLITE_ENABLE_METAL "Enable Metal delegate (iOS only)" OFF)
 option(TFLITE_ENABLE_XNNPACK "Enable XNNPACK backend" ON)
+option(TFLITE_ENABLE_IREE "Enable IREE backend" ON)
 option(TFLITE_ENABLE_EXTERNAL_DELEGATE "Enable External Delegate backend" ON)
 
 option(TFLITE_KERNEL_TEST "Enable tflite kernel unit test" OFF)
@@ -498,6 +499,18 @@ if(TFLITE_ENABLE_XNNPACK)
   list(APPEND TFLITE_TARGET_PUBLIC_OPTIONS "-DXNNPACK_DELEGATE_ENABLE_QS8")
   list(APPEND TFLITE_TARGET_PUBLIC_OPTIONS "-DXNNPACK_DELEGATE_ENABLE_QU8")
 endif()
+
+if(TFLITE_ENABLE_IREE)
+  populate_tflite_source_vars("delegates/iree"
+    TFLITE_DELEGATES_IREE_SRCS
+    FILTER ".*(_test|_tester)\\.(cc|h)"
+  )
+#  list(APPEND TFLITE_TARGET_DEPENDENCIES
+#    IREE
+#)
+  list(APPEND TFLITE_TARGET_PUBLIC_OPTIONS "-DTFLITE_BUILD_WITH_IREE_DELEGATE")
+endif()
+
 if(TFLITE_ENABLE_EXTERNAL_DELEGATE)
   populate_tflite_source_vars("delegates/external"
     TFLITE_DELEGATES_EXTERNAL_SRCS

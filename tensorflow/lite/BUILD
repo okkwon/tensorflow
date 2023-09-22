@@ -924,6 +924,16 @@ cc_library(
 )
 
 cc_library(
+    name = "tflite_with_iree_enabled",
+    compatible_with = get_compatible_with_portable(),
+    defines = ["TFLITE_BUILD_WITH_IREE_DELEGATE"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//tensorflow/lite/delegates/iree:iree_delegate",
+    ],
+)
+
+cc_library(
     name = "tflite_with_xnnpack_default",
     compatible_with = get_compatible_with_portable(),
     visibility = ["//visibility:private"],
