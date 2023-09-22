@@ -33,15 +33,15 @@ typedef struct {
   bool error_during_prepare;
   // Report error during invoke.
   bool error_during_invoke;
-} IreeDelegateOptions;
+} TfLiteIreeDelegateOptions;
 
 // Returns a structure with the default delegate options.
-IreeDelegateOptions TfLiteIreeDelegateOptionsDefault();
+TfLiteIreeDelegateOptions TfLiteIreeDelegateOptionsDefault();
 
 // Creates a new delegate instance that needs to be destroyed with
 // `TfLiteIreeDelegateDelete` when delegate is no longer used by TFLite.
 // When `options` is set to `nullptr`, the above default values are used:
-TfLiteDelegate* TfLiteIreeDelegateCreate(const IreeDelegateOptions* options);
+TfLiteDelegate* TfLiteIreeDelegateCreate(const TfLiteIreeDelegateOptions* options);
 
 // Destroys a delegate created with `TfLiteIreeDelegateCreate` call.
 void TfLiteIreeDelegateDelete(TfLiteDelegate* delegate);
@@ -53,7 +53,7 @@ void TfLiteIreeDelegateDelete(TfLiteDelegate* delegate);
 // A convenient wrapper that returns C++ std::unique_ptr for automatic memory
 // management.
 inline std::unique_ptr<TfLiteDelegate, void (*)(TfLiteDelegate*)>
-TfLiteIreeDelegateCreateUnique(const IreeDelegateOptions* options) {
+TfLiteIreeDelegateCreateUnique(const TfLiteIreeDelegateOptions* options) {
   return std::unique_ptr<TfLiteDelegate, void (*)(TfLiteDelegate*)>(
       TfLiteIreeDelegateCreate(options), TfLiteIreeDelegateDelete);
 }

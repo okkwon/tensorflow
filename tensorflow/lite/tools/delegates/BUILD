@@ -52,6 +52,7 @@ cc_library_with_tflite(
         ":external_delegate_provider",
         ":gpu_delegate_provider",
         ":hexagon_delegate_provider",
+        ":iree_delegate_provider",
         ":nnapi_delegate_provider",
         "//tensorflow/lite/tools/delegates/experimental/stable_delegate:delegate_provider",
     ],
@@ -130,6 +131,18 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "iree_delegate_provider",
+    srcs = ["iree_delegate_provider.cc"],
+    copts = common_copts,
+    deps = [
+        ":delegate_provider_hdr",
+        "//tensorflow/lite/tools/evaluation:utils",
+        "//tensorflow/lite/delegates/iree:iree_delegate",
+    ],
     alwayslink = 1,
 )
 

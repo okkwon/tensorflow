@@ -176,6 +176,12 @@ TfLiteDelegatePtr CreateHexagonDelegate(
 }
 #endif  // TFLITE_ENABLE_HEXAGON
 
+TfLiteDelegatePtr CreateIreeDelegate(TfLiteIreeDelegateOptions* options) {
+  TfLiteDelegate* delegate = TfLiteIreeDelegateCreate(options);
+  return TfLiteDelegatePtr(delegate, [](TfLiteDelegate* delegate) {
+    TfLiteIreeDelegateDelete(delegate);});
+}
+
 #ifdef TFLITE_WITHOUT_XNNPACK
 TfLiteDelegatePtr CreateXNNPACKDelegate(int num_threads) {
   return tools::CreateNullDelegate();

@@ -25,7 +25,7 @@ namespace iree_test {
 // Iree delegate kernel.
 class IreeDelegateKernel : public SimpleDelegateKernelInterface {
  public:
-  explicit IreeDelegateKernel(const IreeDelegateOptions& options)
+  explicit IreeDelegateKernel(const TfLiteIreeDelegateOptions& options)
       : options_(options) {}
 
   TfLiteStatus Init(TfLiteContext* context,
@@ -42,14 +42,14 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   }
 
  private:
-  const IreeDelegateOptions options_;
+  const TfLiteIreeDelegateOptions options_;
 };
 
 // IreeDelegate implements the interface of SimpleDelegateInterface.
 // This holds the Delegate capabilities.
 class IreeDelegate : public SimpleDelegateInterface {
  public:
-  explicit IreeDelegate(const IreeDelegateOptions& options)
+  explicit IreeDelegate(const TfLiteIreeDelegateOptions& options)
       : options_(options) {}
   bool IsNodeSupportedByDelegate(const TfLiteRegistration* registration,
                                  const TfLiteNode* node,
@@ -75,14 +75,14 @@ class IreeDelegate : public SimpleDelegateInterface {
   }
 
  private:
-  const IreeDelegateOptions options_;
+  const TfLiteIreeDelegateOptions options_;
 };
 
 }  // namespace iree_test
 }  // namespace tflite
 
-IreeDelegateOptions TfLiteIreeDelegateOptionsDefault() {
-  IreeDelegateOptions options = {0};
+TfLiteIreeDelegateOptions TfLiteIreeDelegateOptionsDefault() {
+  TfLiteIreeDelegateOptions options = {0};
   // Just assign an invalid builtin code so that this iree test delegate will
   // not support any node by default.
   options.allowed_builtin_code = -1;
@@ -92,7 +92,7 @@ IreeDelegateOptions TfLiteIreeDelegateOptionsDefault() {
 // Creates a new delegate instance that need to be destroyed with
 // `TfLiteIreeDelegateDelete` when delegate is no longer used by TFLite.
 // When `options` is set to `nullptr`, the above default values are used:
-TfLiteDelegate* TfLiteIreeDelegateCreate(const IreeDelegateOptions* options) {
+TfLiteDelegate* TfLiteIreeDelegateCreate(const TfLiteIreeDelegateOptions* options) {
   std::unique_ptr<tflite::iree_test::IreeDelegate> iree(
       new tflite::iree_test::IreeDelegate(
           options ? *options : TfLiteIreeDelegateOptionsDefault()));

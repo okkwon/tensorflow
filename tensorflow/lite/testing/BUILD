@@ -308,6 +308,7 @@ cc_library(
         "//tensorflow/lite/tools/delegates:external_delegate_provider",
         "//tensorflow/lite/tools/delegates:gpu_delegate_provider",
         "//tensorflow/lite/tools/delegates:hexagon_delegate_provider",
+        "//tensorflow/lite/tools/delegates:iree_delegate_provider",
         "//tensorflow/lite/tools/delegates:nnapi_delegate_provider",
         "//tensorflow/lite/tools/delegates:xnnpack_delegate_provider",
     ],

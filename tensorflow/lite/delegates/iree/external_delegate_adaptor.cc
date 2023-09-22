@@ -27,7 +27,7 @@ namespace tools {
 TfLiteDelegate* CreateIreeDelegateFromOptions(
     const char* const* options_keys, const char* const* options_values,
     size_t num_options) {
-  IreeDelegateOptions options = TfLiteIreeDelegateOptionsDefault();
+  TfLiteIreeDelegateOptions options = TfLiteIreeDelegateOptionsDefault();
 
   // Parse key-values options to IreeDelegateOptions by mimicking them as
   // command-line flags.

@@ -45,6 +45,8 @@ limitations under the License.
 #include "tensorflow/lite/delegates/hexagon/hexagon_delegate.h"
 #endif
 
+#include "tensorflow/lite/delegates/iree/iree_delegate.h"
+
 #if TFLITE_SUPPORTS_NNAPI_DELEGATE
 #include "tensorflow/lite/delegates/nnapi/nnapi_delegate.h"
 #endif  // TFLITE_SUPPORTS_NNAPI_DELEGATE
@@ -52,6 +54,7 @@ limitations under the License.
 #ifndef TFLITE_WITHOUT_XNNPACK
 #include "tensorflow/lite/delegates/xnnpack/xnnpack_delegate.h"
 #endif  // !defined(TFLITE_WITHOUT_XNNPACK)
+
 
 #include "tensorflow/lite/c/common.h"
 
@@ -98,6 +101,8 @@ TfLiteDelegatePtr CreateHexagonDelegate(
     const TfLiteHexagonDelegateOptions* options,
     const std::string& library_directory_path);
 #endif
+
+TfLiteDelegatePtr CreateIreeDelegate(TfLiteIreeDelegateOptions* options);
 
 #ifndef TFLITE_WITHOUT_XNNPACK
 TfLiteXNNPackDelegateOptions XNNPackDelegateOptionsDefault();

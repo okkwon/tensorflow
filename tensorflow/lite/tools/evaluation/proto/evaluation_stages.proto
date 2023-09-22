@@ -113,6 +113,7 @@ message TfliteInferenceParams {
     HEXAGON = 3;
     XNNPACK = 4;
     COREML = 5;
+    IREE = 6;
   }
   optional Delegate delegate = 2;
   // Number of threads available to the TFLite Interpreter.

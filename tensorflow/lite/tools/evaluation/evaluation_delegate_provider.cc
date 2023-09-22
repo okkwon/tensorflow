@@ -25,6 +25,7 @@ namespace {
 constexpr char kNnapiDelegate[] = "nnapi";
 constexpr char kGpuDelegate[] = "gpu";
 constexpr char kHexagonDelegate[] = "hexagon";
+constexpr char kIreeDelegate[] = "iree";
 constexpr char kXnnpackDelegate[] = "xnnpack";
 constexpr char kCoremlDelegate[] = "coreml";
 }  // namespace
@@ -34,6 +35,7 @@ TfliteInferenceParams::Delegate ParseStringToDelegateType(
   if (val == kNnapiDelegate) return TfliteInferenceParams::NNAPI;
   if (val == kGpuDelegate) return TfliteInferenceParams::GPU;
   if (val == kHexagonDelegate) return TfliteInferenceParams::HEXAGON;
+  if (val == kIreeDelegate) return TfliteInferenceParams::IREE;
   if (val == kXnnpackDelegate) return TfliteInferenceParams::XNNPACK;
   if (val == kCoremlDelegate) return TfliteInferenceParams::COREML;
   return TfliteInferenceParams::NONE;
@@ -59,6 +61,16 @@ TfLiteDelegatePtr CreateTfLiteDelegate(const TfliteInferenceParams& params,
       if (!p && error_msg) {
         *error_msg =
             "Hexagon delegate is not supported on the platform or required "
+            "libraries are missing.";
+      }
+      return p;
+    }
+    case TfliteInferenceParams::IREE: {
+      TfLiteIreeDelegateOptions options = {0};
+      auto p = CreateIreeDelegate(&options);
+      if (!p && error_msg) {
+        *error_msg =
+            "Iree delegate is not supported on the platform or required "
             "libraries are missing.";
       }
       return p;
@@ -151,6 +163,11 @@ tools::ToolParams DelegateProviders::GetAllParams(
     case TfliteInferenceParams::HEXAGON:
       if (tool_params.HasParam("use_hexagon")) {
         tool_params.Set<bool>("use_hexagon", true);
+      }
+      break;
+    case TfliteInferenceParams::IREE:
+      if (tool_params.HasParam("use_iree")) {
+        tool_params.Set<bool>("use_iree", true);
       }
       break;
     case TfliteInferenceParams::XNNPACK:

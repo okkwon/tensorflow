@@ -41,67 +41,67 @@ cc_binary(
 )
 
 #### The following are for using the iree test delegate in TFLite tooling ####
-cc_library(
-    name = "iree_delegate_provider",
-    srcs = ["iree_delegate_provider.cc"],
-    copts = tflite_copts(),
-    deps = [
-        ":iree_delegate",
-        "//tensorflow/lite/tools/delegates:delegate_provider_hdr",
-    ],
-    alwayslink = 1,
-)
-
-cc_binary(
-    name = "benchmark_model_plus_iree_delegate",
-    copts = tflite_copts(),
-    linkopts = task_linkopts(),
-    deps = [
-        ":iree_delegate_provider",
-        "//tensorflow/lite/tools/benchmark:benchmark_model_main",
-    ],
-)
-
-cc_binary(
-    name = "inference_diff_plus_iree_delegate",
-    copts = tflite_copts(),
-    linkopts = task_linkopts(),
-    deps = [
-        ":iree_delegate_provider",
-        "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
-        "//tensorflow/lite/tools/evaluation/tasks/inference_diff:run_eval_lib",
-    ],
-)
-
-cc_binary(
-    name = "imagenet_classification_eval_plus_iree_delegate",
-    copts = tflite_copts(),
-    linkopts = task_linkopts(),
-    deps = [
-        ":iree_delegate_provider",
-        "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
-        "//tensorflow/lite/tools/evaluation/tasks/imagenet_image_classification:run_eval_lib",
-    ],
-)
-
-cc_binary(
-    name = "coco_object_detection_eval_plus_iree_delegate",
-    copts = tflite_copts(),
-    linkopts = task_linkopts(),
-    deps = [
-        ":iree_delegate_provider",
-        "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
-        "//tensorflow/lite/tools/evaluation/tasks/coco_object_detection:run_eval_lib",
-    ],
-)
-
-sh_test(
-    name = "external_delegate_test",
-    srcs = ["external_delegate_test.sh"],
-    data = [
-        "//tensorflow/lite/delegates/iree:iree_external_delegate.so",
-        "//tensorflow/lite/tools/benchmark:benchmark_model",
-        "@tflite_mobilenet_float//:mobilenet_v1_1.0_224.tflite",
-    ],
-    visibility = ["//visibility:private"],
-)
+# cc_library(
+#     name = "iree_delegate_provider",
+#     srcs = ["iree_delegate_provider.cc"],
+#     copts = tflite_copts(),
+#     deps = [
+#         ":iree_delegate",
+#         "//tensorflow/lite/tools/delegates:delegate_provider_hdr",
+#     ],
+#     alwayslink = 1,
+# )
+# 
+# cc_binary(
+#     name = "benchmark_model_plus_iree_delegate",
+#     copts = tflite_copts(),
+#     linkopts = task_linkopts(),
+#     deps = [
+#         ":iree_delegate_provider",
+#         "//tensorflow/lite/tools/benchmark:benchmark_model_main",
+#     ],
+# )
+# 
+# cc_binary(
+#     name = "inference_diff_plus_iree_delegate",
+#     copts = tflite_copts(),
+#     linkopts = task_linkopts(),
+#     deps = [
+#         ":iree_delegate_provider",
+#         "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
+#         "//tensorflow/lite/tools/evaluation/tasks/inference_diff:run_eval_lib",
+#     ],
+# )
+# 
+# cc_binary(
+#     name = "imagenet_classification_eval_plus_iree_delegate",
+#     copts = tflite_copts(),
+#     linkopts = task_linkopts(),
+#     deps = [
+#         ":iree_delegate_provider",
+#         "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
+#         "//tensorflow/lite/tools/evaluation/tasks/imagenet_image_classification:run_eval_lib",
+#     ],
+# )
+# 
+# cc_binary(
+#     name = "coco_object_detection_eval_plus_iree_delegate",
+#     copts = tflite_copts(),
+#     linkopts = task_linkopts(),
+#     deps = [
+#         ":iree_delegate_provider",
+#         "//tensorflow/lite/tools/evaluation/tasks:task_executor_main",
+#         "//tensorflow/lite/tools/evaluation/tasks/coco_object_detection:run_eval_lib",
+#     ],
+# )
+# 
+# sh_test(
+#     name = "external_delegate_test",
+#     srcs = ["external_delegate_test.sh"],
+#     data = [
+#         "//tensorflow/lite/delegates/iree:iree_external_delegate.so",
+#         "//tensorflow/lite/tools/benchmark:benchmark_model",
+#         "@tflite_mobilenet_float//:mobilenet_v1_1.0_224.tflite",
+#     ],
+#     visibility = ["//visibility:private"],
+# )
