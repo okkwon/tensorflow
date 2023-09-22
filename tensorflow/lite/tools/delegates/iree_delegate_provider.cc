@@ -15,9 +15,9 @@ limitations under the License.
 #include <string>
 #include <utility>
 
+#include "tensorflow/lite/delegates/iree/iree_delegate.h"
 #include "tensorflow/lite/tools/delegates/delegate_provider.h"
 #include "tensorflow/lite/tools/evaluation/utils.h"
-#include "tensorflow/lite/delegates/iree/iree_delegate.h"
 
 namespace tflite {
 namespace tools {
@@ -28,8 +28,7 @@ class IreeDelegateProvider : public DelegateProvider {
     default_params_.AddParam("use_iree", ToolParam::Create<bool>(false));
     default_params_.AddParam("iree_lib_path",
                              ToolParam::Create<std::string>("/data/local/tmp"));
-    default_params_.AddParam("iree_profiling",
-                             ToolParam::Create<bool>(false));
+    default_params_.AddParam("iree_profiling", ToolParam::Create<bool>(false));
   }
 
   std::vector<Flag> CreateFlags(ToolParams* params) const final;
@@ -44,8 +43,7 @@ class IreeDelegateProvider : public DelegateProvider {
 };
 REGISTER_DELEGATE_PROVIDER(IreeDelegateProvider);
 
-std::vector<Flag> IreeDelegateProvider::CreateFlags(
-    ToolParams* params) const {
+std::vector<Flag> IreeDelegateProvider::CreateFlags(ToolParams* params) const {
   std::vector<Flag> flags = {
       CreateFlag<bool>("use_iree", params, "Use Iree delegate"),
       CreateFlag<std::string>(
@@ -54,18 +52,16 @@ std::vector<Flag> IreeDelegateProvider::CreateFlags(
           "path ONLY for the libiree_nn_skel*.so files. For "
           "libiree_interface.so, it needs to be on a system library search "
           "path such as LD_LIBRARY_PATH."),
-      CreateFlag<bool>("iree_profiling", params,
-                       "Enables Iree profiling")};
+      CreateFlag<bool>("iree_profiling", params, "Enables Iree profiling")};
   return flags;
 }
 
 void IreeDelegateProvider::LogParams(const ToolParams& params,
-                                        bool verbose) const {
+                                     bool verbose) const {
   LOG_TOOL_PARAM(params, bool, "use_iree", "Use Iree", verbose);
   LOG_TOOL_PARAM(params, std::string, "iree_lib_path", "Iree lib path",
                  verbose);
-  LOG_TOOL_PARAM(params, bool, "iree_profiling", "Iree profiling",
-                 verbose);
+  LOG_TOOL_PARAM(params, bool, "iree_profiling", "Iree profiling", verbose);
 }
 
 TfLiteDelegatePtr IreeDelegateProvider::CreateTfLiteDelegate(
@@ -80,7 +76,7 @@ TfLiteDelegatePtr IreeDelegateProvider::CreateTfLiteDelegate(
   if (!delegate.get()) {
     TFLITE_LOG(WARN)
         << "Could not create Iree delegate: platform may not support "
-            "delegate or required libraries are missing";
+           "delegate or required libraries are missing";
   }
   return delegate;
 }
