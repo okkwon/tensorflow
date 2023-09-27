@@ -40,6 +40,62 @@ cc_binary(
     ],
 )
 
+################################ Tester classes ################################
+
+cc_library(
+    name = "test_util",
+    testonly = 1,
+    srcs = ["test_util.cc"],
+    hdrs = ["test_util.h"],
+    deps = [
+        "//tensorflow/lite/kernels/internal:cppmath",
+        "//tensorflow/lite/kernels/internal:types",
+    ],
+)
+
+cc_library(
+    name = "binary_elementwise_tester",
+    testonly = 1,
+    srcs = ["binary_elementwise_tester.cc"],
+    hdrs = ["binary_elementwise_tester.h"],
+    deps = [
+        ":test_util",
+        "//tensorflow/lite:framework",
+        "//tensorflow/lite:schema_fbs_version",
+        "//tensorflow/lite/core:framework",
+        "//tensorflow/lite/core/c:common",
+        "//tensorflow/lite/core/kernels:builtin_ops",
+        "//tensorflow/lite/schema:schema_conversion_utils",
+        "//tensorflow/lite/schema:schema_fbs",
+        "@FP16",
+        "@com_google_googletest//:gtest",
+        "@flatbuffers",
+    ],
+)
+
+############################## Integration tests ###############################
+
+cc_library(
+    name = "test_main",
+    testonly = 1,
+    deps = [
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "add_test",
+    srcs = ["add_test.cc"],
+    deps = [
+        ":binary_elementwise_tester",
+        ":iree_delegate",
+        ":test_main",
+#        ":xnnpack_delegate_test_mode",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+
 #### The following are for using the iree test delegate in TFLite tooling ####
 # cc_library(
 #     name = "iree_delegate_provider",
