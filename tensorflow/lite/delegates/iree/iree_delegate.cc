@@ -14,9 +14,12 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/delegates/iree/iree_delegate.h"
 
+#include <cstdio>
 #include <memory>
 #include <utility>
 
+#include "tensorflow/lite/builtin_ops.h"
+#include "tensorflow/lite/delegates/iree/iree_runtime_call.h"
 #include "tensorflow/lite/delegates/utils/simple_delegate.h"
 
 namespace tflite {
@@ -38,7 +41,21 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   }
 
   TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) override {
-    return !options_.error_during_invoke ? kTfLiteOk : kTfLiteError;
+    if (options_.error_during_invoke) return kTfLiteError;
+
+    fprintf(stdout, "*** Eval ***\n");
+
+    const char* module_path_cstr =
+        "/usr/local/google/home/okwan/callable-module/test/simple_add/add.vmfb";
+    // FIXME: get the function name from the TF op.
+    const char* function_name_cstr = "module.add_4d_f32";
+
+    // FIXME: output?
+
+    int result = iree_call(module_path_cstr, function_name_cstr,
+                           context->tensors, 2, NULL, 0);
+
+    return (result == 0) ? kTfLiteOk : kTfLiteError;
   }
 
  private:
@@ -54,6 +71,15 @@ class IreeDelegate : public SimpleDelegateInterface {
   bool IsNodeSupportedByDelegate(const TfLiteRegistration* registration,
                                  const TfLiteNode* node,
                                  TfLiteContext* context) const override {
+    // TODO: check inputs
+    switch (registration->builtin_code) {
+      case kTfLiteBuiltinAdd: {
+        if (node->inputs->size != 2) return false;
+        if (node->outputs->size != 1) return false;
+
+        return true;
+      }
+    }
     // TODO: implement
     return false;
   }
