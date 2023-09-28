@@ -13,11 +13,13 @@ cc_library(
     name = "iree_delegate",
     srcs = [
         "iree_delegate.cc",
+        "iree_runtime_call.c",
     ],
     hdrs = [
         "iree_delegate.h",
     ],
     deps = [
+        "@iree_core//runtime/src/iree/runtime",
         "//tensorflow/lite/core/c:common",
         "//tensorflow/lite/delegates/utils:simple_delegate",
     ],

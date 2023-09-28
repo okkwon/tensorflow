@@ -90,3 +90,12 @@ tf_workspace1()
 load("@//tensorflow:workspace0.bzl", "tf_workspace0")
 
 tf_workspace0()
+
+local_repository(
+    name = "iree_core",
+    path = "../iree",
+)
+
+load("@//:workspace_iree.bzl", "iree_workspace")
+
+iree_workspace()
