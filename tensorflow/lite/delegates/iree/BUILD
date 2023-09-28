@@ -10,6 +10,16 @@ package(
 )
 
 cc_library(
+    name = "iree_runtime_call",
+    srcs = ["iree_runtime_call.c"],
+    hdrs = ["iree_runtime_call.h"],
+    deps = [
+        "@iree_core//runtime/src/iree/runtime",
+         "//tensorflow/lite/core/c:common",
+    ],
+)
+
+cc_library(
     name = "iree_delegate",
     srcs = [
         "iree_delegate.cc",
@@ -19,7 +29,7 @@ cc_library(
         "iree_delegate.h",
     ],
     deps = [
-        "@iree_core//runtime/src/iree/runtime",
+        ":iree_runtime_call",
         "//tensorflow/lite/core/c:common",
         "//tensorflow/lite/delegates/utils:simple_delegate",
     ],

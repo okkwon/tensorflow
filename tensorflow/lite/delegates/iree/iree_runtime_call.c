@@ -54,9 +54,9 @@ static iree_status_t iree_runtime_module_call(
     iree_host_size_t num_inputs, iree_const_byte_span_t module_contents,
     int* out_exit_code);
 
-int call_module(const char* module_path_cstr, const char* function_name_cstr,
-                TfLiteTensor* tf_inputs, size_t num_inputs,
-                TfLiteTensor* tf_outputs, size_t num_outputs) {
+int iree_call(const char* module_path_cstr, const char* function_name_cstr,
+              TfLiteTensor* tf_inputs, size_t num_inputs,
+              TfLiteTensor* tf_outputs, size_t num_outputs) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -99,31 +99,31 @@ int call_module(const char* module_path_cstr, const char* function_name_cstr,
   return exit_code;
 }
 
-int main(int argc, char** argv) {
+int test_add_4d_f32() {
   // FIXME: add a logic to select an op from the op type.
   const char* module_path_cstr =
       "/usr/local/google/home/okwan/callable-module/test/simple_add/add.vmfb";
   // FIXME: get the function name from the TF op.
   float in_data0[1] = {1.0f};
   float in_data1[1] = {2.0f};
-  const char* function_name_cstr = "module.add_1d_f32";
+  const char* function_name_cstr = "module.add_4d_f32";
   TfLiteTensor tf_inputs[2] = {
       {/*.elemType=*/kTfLiteFloat32, /*.data=*/in_data0, /*.rank=*/1,
-       /*.dims=*/{1}, /*.num_dims=*/1, /*.bytes=*/4},
+       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
       {/*.elemType=*/kTfLiteFloat32, /*.data=*/in_data1, /*.rank=*/1,
-       /*.dims=*/{1}, /*.num_dims=*/1, /*.bytes=*/4},
+       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
   };
   size_t num_inputs = 2;
 
   float out_data0[1] = {0.0f};
   TfLiteTensor tf_outputs[1] = {
       {/*.elemType=*/kTfLiteFloat32, /*.data=*/out_data0, /*.rank=*/1,
-       /*.dims=*/{1}, /*.num_dims=*/1, /*.bytes=*/4},
+       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
   };
   size_t num_outputs = 1;
 
-  return call_module(module_path_cstr, function_name_cstr, tf_inputs,
-                     num_inputs, tf_outputs, num_outputs);
+  return iree_call(module_path_cstr, function_name_cstr, tf_inputs,
+                   num_inputs, tf_outputs, num_outputs);
 }
 
 /* out_list is a list of iree_buffer_view_ref_t.
