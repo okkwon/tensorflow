@@ -122,6 +122,7 @@ static iree_status_t iree_runtime_call_function(
         arg_shape[dim] = tf_tensor->dims->data[dim];
       }
 
+      // FIXME: import a buffer, don't copy
       status = iree_hal_buffer_view_allocate_buffer_copy(
           device, device_allocator,
           // Shape rank and dimensions:
@@ -160,31 +161,37 @@ static iree_status_t iree_runtime_call_function(
   }
 
   // Process the outputs.
-  iree_hal_buffer_view_t* ret0 = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret0);
-  }
+  // FIXME: figure out how to output to the tf output buffer. Would need to use
+  // DPS.
+  for (int i = 0; i < node->outputs->size; ++i) {
+    iree_hal_buffer_view_t* ret_buffer_view = NULL;
+    if (iree_status_is_ok(status)) {
+      status = iree_runtime_call_outputs_pop_front_buffer_view(
+          &call, &ret_buffer_view);
+    }
 
-  if (iree_status_is_ok(status)) {
-    int output0_index = node->outputs->data[0];
-    TfLiteTensor* tf_tensor = &context->tensors[output0_index];
+    if (iree_status_is_ok(status)) {
+      int tensor_index = node->outputs->data[i];
+      TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
 
-    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        iree_hal_buffer_view_buffer(ret0), IREE_HAL_MAPPING_MODE_SCOPED,
-        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping));
-    memcpy(tf_tensor->data.f, buffer_mapping.contents.data,
-           buffer_mapping.contents.data_length);
+      iree_hal_buffer_mapping_t buffer_mapping = {{0}};
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+          iree_hal_buffer_view_buffer(ret_buffer_view),
+          IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
+          IREE_WHOLE_BUFFER, &buffer_mapping));
+      memcpy(tf_tensor->data.f, buffer_mapping.contents.data,
+             buffer_mapping.contents.data_length);
+    }
+    if (iree_status_is_ok(status)) {
+      // This prints the buffer view out but an application could read its
+      // contents, pass it to another call, etc.
+      fprintf(stdout, "out  : ");
+      status = iree_hal_buffer_view_fprint(
+          stdout, ret_buffer_view, /*max_element_count=*/4096, host_allocator);
+      fprintf(stdout, "\n");
+    }
+    iree_hal_buffer_view_release(ret_buffer_view);
   }
-  if (iree_status_is_ok(status)) {
-    // This prints the buffer view out but an application could read its
-    // contents, pass it to another call, etc.
-    fprintf(stdout, "out  : ");
-    status = iree_hal_buffer_view_fprint(
-        stdout, ret0, /*max_element_count=*/4096, host_allocator);
-    fprintf(stdout, "\n");
-  }
-  iree_hal_buffer_view_release(ret0);
 
   iree_runtime_call_deinitialize(&call);
   return status;
