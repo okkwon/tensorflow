@@ -1,4 +1,4 @@
-/* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,9 +31,63 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   explicit IreeDelegateKernel(const TfLiteIreeDelegateOptions& options)
       : options_(options) {}
 
+  virtual ~IreeDelegateKernel() {
+    iree_runtime_session_release(iree_runtime_session_);
+    iree_runtime_instance_release(iree_runtime_instance_);
+  }
+
   TfLiteStatus Init(TfLiteContext* context,
                     const TfLiteDelegateParams* params) override {
-    return !options_.error_during_init ? kTfLiteOk : kTfLiteError;
+    module_path_cstr_ =
+        "/usr/local/google/home/okwan/callable-module/test/simple_add/"
+        "add.vmfb";
+    // Set up the shared runtime instance.
+    // An application should usually only have one of these and share it across
+    // all of the sessions it has. The instance is thread-safe, while the
+    // sessions are only thread-compatible (you need to lock if its required).
+    iree_runtime_instance_options_initialize(&iree_runtime_instance_options_);
+    iree_runtime_instance_options_use_all_available_drivers(
+        &iree_runtime_instance_options_);
+    iree_runtime_instance_ = NULL;
+    iree_status_t status = iree_runtime_instance_create(
+        &iree_runtime_instance_options_, iree_allocator_system(),
+        &iree_runtime_instance_);
+
+    iree_hal_device_t* iree_device = nullptr;
+
+    if (iree_status_is_ok(status)) {
+      status = iree_runtime_instance_try_create_default_device(
+          iree_runtime_instance_, iree_make_cstring_view("local-task"),
+          &iree_device);
+    }
+
+    // Set up the session to run the module.
+    // Sessions are like OS processes and are used to isolate modules from
+    // each other and hold runtime state such as the variables used within the
+    // module. The same module loaded into two sessions will see their own
+    // private state.
+    if (iree_status_is_ok(status)) {
+      iree_runtime_session_options_initialize(&iree_runtime_session_options_);
+      iree_status_t status = iree_runtime_session_create_with_device(
+          iree_runtime_instance_, &iree_runtime_session_options_, iree_device,
+          iree_runtime_instance_host_allocator(iree_runtime_instance_),
+          &iree_runtime_session_);
+      // Session keeps device reference internally.
+      iree_hal_device_release(iree_device);
+    }
+
+    // Load the compiled user module in a demo-specific way.
+    // Applications could specify files, embed the outputs directly in their
+    // binaries, fetch them over the network, etc.
+    if (iree_status_is_ok(status)) {
+      status = iree_runtime_session_append_bytecode_module_from_file(
+          iree_runtime_session_, module_path_cstr_);
+    }
+
+    // Build and issue the call.
+    if (iree_status_is_ok(status)) {
+      return !options_.error_during_init ? kTfLiteOk : kTfLiteError;
+    }
   }
 
   TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) override {
@@ -43,22 +97,23 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) override {
     if (options_.error_during_invoke) return kTfLiteError;
 
-    fprintf(stdout, "*** Eval ***\n");
-
-    const char* module_path_cstr =
-        "/usr/local/google/home/okwan/callable-module/test/simple_add/add.vmfb";
     // FIXME: get the function name from the TF op.
     const char* function_name_cstr = "module.add_4d_f32";
+    iree_string_view_t function_name =
+        iree_make_cstring_view(function_name_cstr);
 
-    // FIXME: output?
-
-    int result = iree_call(module_path_cstr, function_name_cstr, context, node);
-
-    return (result == 0) ? kTfLiteOk : kTfLiteError;
+    iree_status_t status = iree_runtime_call_function(
+        iree_runtime_session_, function_name, context, node);
+    return iree_status_is_ok(status) ? kTfLiteOk : kTfLiteError;
   }
 
  private:
   const TfLiteIreeDelegateOptions options_;
+  iree_runtime_instance_options_t iree_runtime_instance_options_;
+  iree_runtime_instance_t* iree_runtime_instance_ = nullptr;
+  iree_runtime_session_t* iree_runtime_session_ = nullptr;
+  iree_runtime_session_options_t iree_runtime_session_options_;
+  const char* module_path_cstr_ = nullptr;
 };
 
 // IreeDelegate implements the interface of SimpleDelegateInterface.

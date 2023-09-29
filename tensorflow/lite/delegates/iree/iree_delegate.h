@@ -41,7 +41,8 @@ TfLiteIreeDelegateOptions TfLiteIreeDelegateOptionsDefault();
 // Creates a new delegate instance that needs to be destroyed with
 // `TfLiteIreeDelegateDelete` when delegate is no longer used by TFLite.
 // When `options` is set to `nullptr`, the above default values are used:
-TfLiteDelegate* TfLiteIreeDelegateCreate(const TfLiteIreeDelegateOptions* options);
+TfLiteDelegate* TfLiteIreeDelegateCreate(
+    const TfLiteIreeDelegateOptions* options);
 
 // Destroys a delegate created with `TfLiteIreeDelegateCreate` call.
 void TfLiteIreeDelegateDelete(TfLiteDelegate* delegate);

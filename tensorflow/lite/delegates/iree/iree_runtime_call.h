@@ -16,6 +16,7 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
 #define TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
 
+#include "iree/runtime/api.h"
 #include "tensorflow/lite/core/c/common.h"
 
 #define MAX_TENSOR_DIMS 9
@@ -23,8 +24,10 @@ limitations under the License.
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-int iree_call(const char* module_path_cstr, const char* function_name_cstr,
-              TfLiteContext* context, TfLiteNode* node);
+iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
+                                         iree_string_view_t function_name,
+                                         TfLiteContext* context,
+                                         TfLiteNode* node);
 #ifdef __cplusplus
 }
 #endif  // __cplusplus
