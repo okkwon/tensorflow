@@ -101,12 +101,13 @@ static iree_status_t iree_runtime_call_function(
   // handle inputs
   for (int i = 0; i < node->inputs->size; ++i) {
     iree_hal_buffer_view_t* arg = NULL;
+    const int tensor_index = node->inputs->data[i];
 
     if (iree_status_is_ok(status)) {
       iree_hal_dim_t arg_shape[MAX_TENSOR_DIMS] = {
           1,
       };
-      const TfLiteTensor* tf_tensor = &context->tensors[i];
+      const TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
       const float* arg_data = tf_tensor->data.f;
 
       fprintf(stdout, "tf_tensor->dims->size = %d\n", tf_tensor->dims->size);
@@ -158,16 +159,27 @@ static iree_status_t iree_runtime_call_function(
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
-  // Dump the function outputs.
+  // Process the outputs.
   iree_hal_buffer_view_t* ret0 = NULL;
   if (iree_status_is_ok(status)) {
-    // Try to get the first call result as a buffer view.
     status = iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret0);
+  }
+
+  if (iree_status_is_ok(status)) {
+    int output0_index = node->outputs->data[0];
+    TfLiteTensor* tf_tensor = &context->tensors[output0_index];
+
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        iree_hal_buffer_view_buffer(ret0), IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping));
+    memcpy(tf_tensor->data.f, buffer_mapping.contents.data,
+           buffer_mapping.contents.data_length);
   }
   if (iree_status_is_ok(status)) {
     // This prints the buffer view out but an application could read its
     // contents, pass it to another call, etc.
-    fprintf(stdout, "out = ");
+    fprintf(stdout, "out  : ");
     status = iree_hal_buffer_view_fprint(
         stdout, ret0, /*max_element_count=*/4096, host_allocator);
     fprintf(stdout, "\n");
