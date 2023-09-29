@@ -52,8 +52,7 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
 
     // FIXME: output?
 
-    int result = iree_call(module_path_cstr, function_name_cstr,
-                           context->tensors, 2, NULL, 0);
+    int result = iree_call(module_path_cstr, function_name_cstr, context, node);
 
     return (result == 0) ? kTfLiteOk : kTfLiteError;
   }

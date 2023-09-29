@@ -24,8 +24,7 @@ limitations under the License.
 extern "C" {
 #endif  // __cplusplus
 int iree_call(const char* module_path_cstr, const char* function_name_cstr,
-              TfLiteTensor* tf_inputs, size_t num_inputs,
-              TfLiteTensor* tf_outputs, size_t num_outputs);
+              TfLiteContext* context, TfLiteNode* node);
 #ifdef __cplusplus
 }
 #endif  // __cplusplus

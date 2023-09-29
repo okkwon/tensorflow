@@ -18,13 +18,11 @@ typedef struct iree_string_list_t {
 
 static iree_status_t iree_runtime_module_call(
     iree_runtime_instance_t* instance, iree_string_view_t module_path,
-    iree_string_view_t function_name, TfLiteTensor* tf_inputs,
-    iree_host_size_t num_inputs, iree_const_byte_span_t module_contents,
-    int* out_exit_code);
+    iree_string_view_t function_name, TfLiteContext* context, TfLiteNode* node,
+    iree_const_byte_span_t module_contents, int* out_exit_code);
 
 int iree_call(const char* module_path_cstr, const char* function_name_cstr,
-              TfLiteTensor* tf_inputs, size_t num_inputs,
-              TfLiteTensor* tf_outputs, size_t num_outputs) {
+              TfLiteContext* context, TfLiteNode* node) {
   IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -49,9 +47,9 @@ int iree_call(const char* module_path_cstr, const char* function_name_cstr,
     iree_string_view_t module_path = iree_make_cstring_view(module_path_cstr);
     iree_string_view_t function_name =
         iree_make_cstring_view(function_name_cstr);
-    status = iree_runtime_module_call(instance, module_path, function_name,
-                                      tf_inputs, num_inputs, module_contents,
-                                      &exit_code);
+    status =
+        iree_runtime_module_call(instance, module_path, function_name, context,
+                                 node, module_contents, &exit_code);
   }
 
   iree_runtime_instance_release(instance);
@@ -84,7 +82,7 @@ int iree_call(const char* module_path_cstr, const char* function_name_cstr,
 */
 static iree_status_t iree_runtime_call_function(
     iree_runtime_session_t* session, iree_string_view_t function_name,
-    TfLiteTensor* tf_inputs, iree_host_size_t num_inputs) {
+    TfLiteContext* context, TfLiteNode* node) {
   // Initialize the call to the function.
   iree_runtime_call_t call;
   IREE_RETURN_IF_ERROR(
@@ -101,14 +99,14 @@ static iree_status_t iree_runtime_call_function(
   iree_status_t status = iree_ok_status();
 
   // handle inputs
-  for (iree_host_size_t i = 0; i < num_inputs; ++i) {
+  for (int i = 0; i < node->inputs->size; ++i) {
     iree_hal_buffer_view_t* arg = NULL;
 
     if (iree_status_is_ok(status)) {
       iree_hal_dim_t arg_shape[MAX_TENSOR_DIMS] = {
           1,
       };
-      const TfLiteTensor* tf_tensor = &tf_inputs[i];
+      const TfLiteTensor* tf_tensor = &context->tensors[i];
       const float* arg_data = tf_tensor->data.f;
 
       fprintf(stdout, "tf_tensor->dims->size = %d\n", tf_tensor->dims->size);
@@ -182,9 +180,8 @@ static iree_status_t iree_runtime_call_function(
 
 static iree_status_t iree_runtime_module_call(
     iree_runtime_instance_t* instance, iree_string_view_t module_path,
-    iree_string_view_t function_name, TfLiteTensor* tf_inputs,
-    iree_host_size_t num_inputs, iree_const_byte_span_t module_contents,
-    int* out_exit_code) {
+    iree_string_view_t function_name, TfLiteContext* context, TfLiteNode* node,
+    iree_const_byte_span_t module_contents, int* out_exit_code) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // TODO(#5724): move device selection into the compiled modules.
@@ -214,8 +211,7 @@ static iree_status_t iree_runtime_module_call(
 
   // Build and issue the call.
   if (iree_status_is_ok(status)) {
-    status = iree_runtime_call_function(session, function_name, tf_inputs,
-                                        num_inputs);
+    status = iree_runtime_call_function(session, function_name, context, node);
   }
 
   // Release the session and free all resources.
