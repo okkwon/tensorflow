@@ -16,9 +16,9 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
 #define TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
 
-#include <memory>
-
 #include "tensorflow/lite/core/c/common.h"
+
+#define MAX_TENSOR_DIMS 9
 
 #ifdef __cplusplus
 extern "C" {

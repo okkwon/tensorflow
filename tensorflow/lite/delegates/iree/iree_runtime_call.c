@@ -3,43 +3,11 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#include "iree_runtime_call.h"
 
 #include "iree/runtime/api.h"
 
-// Temporary struct to mimic TFLiteTensor for testing.
-// FIXME: should be merged when integrating this file into the iree delegate
-typedef enum {
-  kTfLiteNoType = 0,
-  kTfLiteFloat32 = 1,
-  kTfLiteInt32 = 2,
-  kTfLiteUInt8 = 3,
-  kTfLiteInt64 = 4,
-  kTfLiteString = 5,
-  kTfLiteBool = 6,
-  kTfLiteInt16 = 7,
-  kTfLiteComplex64 = 8,
-  kTfLiteInt8 = 9,
-  kTfLiteFloat16 = 10,
-  kTfLiteFloat64 = 11,
-  kTfLiteComplex128 = 12,
-  kTfLiteUInt64 = 13,
-  kTfLiteResource = 14,
-  kTfLiteVariant = 15,
-  kTfLiteUInt32 = 16,
-  kTfLiteUInt16 = 17,
-  kTfLiteInt4 = 18,
-} TfLiteType;
-
 #define TFLITE_MAX_RANK 4  // FIXME
-
-typedef struct TfLiteTensor {
-  TfLiteType elemType;
-  float* data;  // FIXME: should be a union
-  int rank;
-  int dims[TFLITE_MAX_RANK];
-  int num_dims;
-  size_t bytes;
-} TfLiteTensor;
 
 typedef struct iree_string_list_t {
   // Total number of values in the list.
@@ -97,33 +65,6 @@ int iree_call(const char* module_path_cstr, const char* function_name_cstr,
   IREE_TRACE_ZONE_END(z0);
   IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
-}
-
-int test_add_4d_f32() {
-  // FIXME: add a logic to select an op from the op type.
-  const char* module_path_cstr =
-      "/usr/local/google/home/okwan/callable-module/test/simple_add/add.vmfb";
-  // FIXME: get the function name from the TF op.
-  float in_data0[1] = {1.0f};
-  float in_data1[1] = {2.0f};
-  const char* function_name_cstr = "module.add_4d_f32";
-  TfLiteTensor tf_inputs[2] = {
-      {/*.elemType=*/kTfLiteFloat32, /*.data=*/in_data0, /*.rank=*/1,
-       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
-      {/*.elemType=*/kTfLiteFloat32, /*.data=*/in_data1, /*.rank=*/1,
-       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
-  };
-  size_t num_inputs = 2;
-
-  float out_data0[1] = {0.0f};
-  TfLiteTensor tf_outputs[1] = {
-      {/*.elemType=*/kTfLiteFloat32, /*.data=*/out_data0, /*.rank=*/1,
-       /*.dims=*/{1,1,1,1}, /*.num_dims=*/4, /*.bytes=*/4},
-  };
-  size_t num_outputs = 1;
-
-  return iree_call(module_path_cstr, function_name_cstr, tf_inputs,
-                   num_inputs, tf_outputs, num_outputs);
 }
 
 /* out_list is a list of iree_buffer_view_ref_t.
