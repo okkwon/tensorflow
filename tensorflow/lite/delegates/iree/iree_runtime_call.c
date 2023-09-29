@@ -37,8 +37,6 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
       const TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
       const float* arg_data = tf_tensor->data.f;
 
-      fprintf(stdout, "tf_tensor->dims->size = %d\n", tf_tensor->dims->size);
-
       if (tf_tensor->dims->size > MAX_TENSOR_DIMS) {
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                 "only supports up to %d dims but got %d",
@@ -72,15 +70,19 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
           &arg);
     }
     if (iree_status_is_ok(status)) {
+#ifndef NDEBUG
       fprintf(stdout, "arg %zu: ", i);
       IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(
           stdout, arg, /*max_element_count=*/4096, host_allocator));
+#endif  // NDEBUG
       // Add to the call inputs list (which retains the buffer view).
       status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg);
     }
     // Since the call retains the buffer view we can release it here.
     iree_hal_buffer_view_release(arg);
+#ifndef NDEBUG
     fprintf(stdout, "\n");
+#endif  // NDEBUG
   }
   // Synchronously perform the call.
   if (iree_status_is_ok(status)) {
@@ -109,6 +111,7 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
       memcpy(tf_tensor->data.f, buffer_mapping.contents.data,
              buffer_mapping.contents.data_length);
     }
+#ifndef NDEBUG
     if (iree_status_is_ok(status)) {
       // This prints the buffer view out but an application could read its
       // contents, pass it to another call, etc.
@@ -117,6 +120,7 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
           stdout, ret_buffer_view, /*max_element_count=*/4096, host_allocator);
       fprintf(stdout, "\n");
     }
+#endif  // NDEBUG
     iree_hal_buffer_view_release(ret_buffer_view);
   }
 
