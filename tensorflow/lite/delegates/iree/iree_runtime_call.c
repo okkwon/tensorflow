@@ -50,8 +50,8 @@ int iree_call(const char* module_path_cstr, const char* function_name_cstr,
     iree_string_view_t function_name =
         iree_make_cstring_view(function_name_cstr);
     status = iree_runtime_module_call(instance, module_path, function_name,
-                                      tf_inputs, num_inputs,
-                                      module_contents, &exit_code);
+                                      tf_inputs, num_inputs, module_contents,
+                                      &exit_code);
   }
 
   iree_runtime_instance_release(instance);
@@ -105,13 +105,28 @@ static iree_status_t iree_runtime_call_function(
     iree_hal_buffer_view_t* arg = NULL;
 
     if (iree_status_is_ok(status)) {
-      const iree_hal_dim_t arg_shape[1] = {1};  // FIXME:
-      const float* arg_data = tf_inputs[i].data;
+      iree_hal_dim_t arg_shape[MAX_TENSOR_DIMS] = {
+          1,
+      };
+      const TfLiteTensor* tf_tensor = &tf_inputs[i];
+      const float* arg_data = tf_tensor->data.f;
+
+      fprintf(stdout, "tf_tensor->dims->size = %d\n", tf_tensor->dims->size);
+
+      if (tf_tensor->dims->size > MAX_TENSOR_DIMS) {
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "only supports up to %d dims but got %d",
+                                sizeof(arg_shape), tf_tensor->dims->size);
+      }
+
+      for (int dim = 0; dim < tf_tensor->dims->size; ++dim) {
+        arg_shape[dim] = tf_tensor->dims->data[dim];
+      }
 
       status = iree_hal_buffer_view_allocate_buffer_copy(
           device, device_allocator,
           // Shape rank and dimensions:
-          IREE_ARRAYSIZE(arg_shape), arg_shape,
+          tf_tensor->dims->size, arg_shape,
           // Element type:
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
           // Encoding type:
@@ -125,7 +140,7 @@ static iree_status_t iree_runtime_call_function(
               .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           },
           // The actual heap buffer to wrap or clone and its allocator:
-          iree_make_const_byte_span(arg_data, tf_inputs[i].bytes),
+          iree_make_const_byte_span(arg_data, tf_tensor->bytes),
           // Buffer view + storage are returned and owned by the caller:
           &arg);
     }
