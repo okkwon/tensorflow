@@ -15,12 +15,15 @@ limitations under the License.
 #include "tensorflow/lite/delegates/iree/iree_delegate.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <utility>
 
 #include "tensorflow/lite/builtin_ops.h"
 #include "tensorflow/lite/delegates/iree/iree_runtime_call.h"
 #include "tensorflow/lite/delegates/utils/simple_delegate.h"
+
+constexpr char kVMFBPath[] = "VMFB_PATH";
 
 namespace tflite {
 namespace iree_test {
@@ -38,9 +41,10 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
 
   TfLiteStatus Init(TfLiteContext* context,
                     const TfLiteDelegateParams* params) override {
-    module_path_cstr_ =
-        "/usr/local/google/home/okwan/callable-module/test/simple_add/"
-        "add.vmfb";
+    module_path_cstr_ = std::getenv(kVMFBPath);
+    if (!module_path_cstr_) {
+      return kTfLiteError;
+    }
     // Set up the shared runtime instance.
     // An application should usually only have one of these and share it across
     // all of the sessions it has. The instance is thread-safe, while the
