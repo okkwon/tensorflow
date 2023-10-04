@@ -33,6 +33,23 @@ TfLiteRegistration* Register_DETECTION_POSTPROCESS();
 
 namespace builtin {
 
+TfLiteStatus DeferToDelegateInvoke(TfLiteContext* context, TfLiteNode* node) {
+  TF_LITE_KERNEL_LOG(context,
+                     "Encountered an unresolved deferred op. This op needs "
+                     "to be handled by a delegate.");
+  return kTfLiteError;
+}
+
+TfLiteRegistration* Register_DEFER_TO_DELEGATE() {
+  static TfLiteRegistration r = {nullptr, nullptr, nullptr,
+                                 &DeferToDelegateInvoke};
+  return &r;
+}
+
+void BuiltinOpResolver::AddDeferToDelegateRegistrations() {
+  AddBuiltin(BuiltinOperator_STABLEHLO_ADD, Register_DEFER_TO_DELEGATE());
+}
+
 BuiltinOpResolver::BuiltinOpResolver() {
   AddBuiltin(BuiltinOperator_ABS, Register_ABS(), /* min_version = */ 1,
              /* max_version = */ 5);
@@ -380,6 +397,9 @@ BuiltinOpResolver::BuiltinOpResolver() {
   AddBuiltin(BuiltinOperator_STABLEHLO_MULTIPLY, Register_STABLEHLO_MULTIPLY());
   AddBuiltin(BuiltinOperator_STABLEHLO_MAXIMUM, Register_STABLEHLO_MAXIMUM());
   AddBuiltin(BuiltinOperator_STABLEHLO_MINIMUM, Register_STABLEHLO_MINIMUM());
+
+  AddDeferToDelegateRegistrations();
+
   AddCustom("NumericVerify", tflite::ops::custom::Register_NUMERIC_VERIFY());
   // TODO(andrewharp, ahentz): Move these somewhere more appropriate so that
   // custom ops aren't always included by default.

@@ -29,6 +29,9 @@ namespace builtin {
 // This built-in op resolver provides a list of TfLite delegates that could be
 // applied by TfLite interpreter by default.
 class BuiltinOpResolver : public MutableOpResolver {
+ protected:
+  void AddDeferToDelegateRegistrations();
+
  public:
   // NOTE: we *deliberately* don't define any virtual functions here to avoid
   // behavior changes when users pass a derived instance by value or assign a
