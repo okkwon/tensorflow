@@ -133,6 +133,8 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
       fprintf(stdout, "\n");
     }
 #endif  // NDEBUG
+    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(ret_buffer_view);
+    iree_hal_buffer_release(buffer);
     iree_hal_buffer_view_release(ret_buffer_view);
   }
 
