@@ -35,7 +35,6 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
           1,
       };
       const TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
-      const float* arg_data = tf_tensor->data.f;
 
       if (tf_tensor->dims->size > MAX_TENSOR_DIMS) {
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -47,27 +46,40 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
         arg_shape[dim] = tf_tensor->dims->data[dim];
       }
 
-      // FIXME: import a buffer, don't copy
-      status = iree_hal_buffer_view_allocate_buffer_copy(
-          device, device_allocator,
-          // Shape rank and dimensions:
-          tf_tensor->dims->size, arg_shape,
-          // Element type:
-          IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-          // Encoding type:
-          IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-          (iree_hal_buffer_params_t){
-              // Where to allocate (host or device):
-              .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-              // Access to allow to this memory:
-              .access = IREE_HAL_MEMORY_ACCESS_ALL,
-              // Intended usage of the buffer (transfers, dispatches, etc):
-              .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-          },
-          // The actual heap buffer to wrap or clone and its allocator:
-          iree_make_const_byte_span(arg_data, tf_tensor->bytes),
-          // Buffer view + storage are returned and owned by the caller:
-          &arg);
+      // import the buffer
+      const iree_hal_buffer_params_t params = {
+          .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST |
+                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+          .access = IREE_HAL_MEMORY_ACCESS_READ,
+          .queue_affinity = 0,
+      };
+      iree_hal_external_buffer_t external_buffer = {
+          .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+          .flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE,
+          .size = tf_tensor->bytes,
+          .handle.host_allocation.ptr = tf_tensor->data.f,
+      };
+      iree_hal_buffer_release_callback_t null_callback = {
+          .fn = NULL,
+          .user_data = NULL,
+      };
+      iree_hal_buffer_t* buffer = NULL;
+      iree_status_t status = iree_hal_allocator_import_buffer(
+          device_allocator, params, &external_buffer, null_callback, &buffer);
+
+      if (iree_status_is_ok(status)) {
+        // create a buffer view of the imported buffer
+        status = iree_hal_buffer_view_create(
+            buffer, tf_tensor->dims->size, arg_shape,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, &arg);
+      }
+
+      if (iree_status_is_ok(status)) {
+        // The buffer view retains the buffer.
+        iree_hal_buffer_release(buffer);
+      }
     }
     if (iree_status_is_ok(status)) {
 #ifndef NDEBUG
