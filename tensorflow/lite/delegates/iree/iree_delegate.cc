@@ -18,6 +18,7 @@ limitations under the License.
 #include <cstdlib>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "tensorflow/lite/builtin_ops.h"
 #include "tensorflow/lite/delegates/iree/iree_runtime_call.h"
@@ -45,6 +46,11 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     if (!module_path_cstr_) {
       return kTfLiteError;
     }
+
+#ifndef NDEBUG
+    printf("VMFB_PATH = %s\n", module_path_cstr_);
+#endif
+
     // Set up the shared runtime instance.
     // An application should usually only have one of these and share it across
     // all of the sessions it has. The instance is thread-safe, while the
@@ -89,9 +95,33 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     }
 
     // Build and issue the call.
-    if (iree_status_is_ok(status)) {
-      return !options_.error_during_init ? kTfLiteOk : kTfLiteError;
+    if (!iree_status_is_ok(status)) return kTfLiteError;
+
+    // Save index to all nodes which are part of this delegate.
+    inputs_.resize(params->nodes_to_replace->size);
+    outputs_.resize(params->nodes_to_replace->size);
+    builtin_code_.resize(params->nodes_to_replace->size);
+
+    // Currently, we only support a single builtin code.
+    TF_LITE_ENSURE_EQ(context, builtin_code_.size(), 1);
+
+    for (int i = 0; i < params->nodes_to_replace->size; ++i) {
+      const int node_index = params->nodes_to_replace->data[i];
+      // Get this node information.
+      TfLiteNode* delegated_node = nullptr;
+      TfLiteRegistration* delegated_node_registration = nullptr;
+      TF_LITE_ENSURE_EQ(
+          context,
+          context->GetNodeAndRegistration(context, node_index, &delegated_node,
+                                          &delegated_node_registration),
+          kTfLiteOk);
+      inputs_[i].push_back(delegated_node->inputs->data[0]);
+      inputs_[i].push_back(delegated_node->inputs->data[1]);
+      outputs_[i].push_back(delegated_node->outputs->data[0]);
+      builtin_code_[i] = delegated_node_registration->builtin_code;
     }
+
+    return kTfLiteOk;
   }
 
   TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) override {
@@ -101,17 +131,96 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) override {
     if (options_.error_during_invoke) return kTfLiteError;
 
-    // FIXME: get the function name from the TF op.
-    const char* function_name_cstr = "module.add_4d_f32";
-    iree_string_view_t function_name =
-        iree_make_cstring_view(function_name_cstr);
+    // Evaluate the delegated graph.
+    // Here we loop over all the delegated nodes.
+    // We know that all the nodes are either ADD or SUB operations and the
+    // number of nodes equals ''inputs_.size()'' and inputs[i] is a list of
+    // tensor indices for inputs to node ''i'', while outputs_[i] is the list of
+    // outputs for node
+    // ''i''. Note, that it is intentional we have simple implementation as this
+    // is for demonstration.
 
-    iree_status_t status = iree_runtime_call_function(
-        iree_runtime_session_, function_name, context, node);
-    return iree_status_is_ok(status) ? kTfLiteOk : kTfLiteError;
+    for (int i = 0; i < inputs_.size(); ++i) {
+      // FIXME: get the function name from the TF op.
+      std::string function_name_str =
+          GetFunctionName(context, builtin_code_[i], inputs_[i], outputs_[i]);
+      iree_string_view_t function_name =
+          iree_make_cstring_view(function_name_str.c_str());
+
+      iree_status_t status = iree_runtime_call_function(
+          iree_runtime_session_, function_name, context, node);
+
+      if (!iree_status_is_ok(status)) return kTfLiteError;
+    }
+    return kTfLiteOk;
   }
 
  private:
+  TfLiteType GetType(TfLiteContext* context, int tensor_index) {
+    return context->tensors[tensor_index].type;
+  }
+
+  bool HasSameType(TfLiteContext* context, std::vector<int>& indexes) {
+    TfLiteType type = kTfLiteNoType;
+    bool is_type_unset = true;
+    for (int index : indexes) {
+      TfLiteType tensor_type = GetType(context, index);
+      if (is_type_unset) {
+        type = tensor_type;
+      } else {
+        if (tensor_type != type) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  std::string GetTypeSuffix(TfLiteType type) {
+    switch (type) {
+      case kTfLiteFloat32:
+        return "_f32";
+      default:
+        return "";
+    }
+  }
+
+  std::string GetFunctionName(TfLiteContext* context, int builtin_code,
+                              std::vector<int>& inputs,
+                              std::vector<int>& outputs) {
+    std::string name = "module.";
+    switch (builtin_code) {
+      case kTfLiteBuiltinAdd:
+      case kTfLiteBuiltinStablehloAdd:
+        name += "add_4d";
+        break;
+      default:
+        return "";
+    }
+    // Handle the type. When all the input types are the same, the type is
+    // specified once in the function name. Otherwise, all types are
+    // specified.
+    if (HasSameType(context, inputs)) {
+      TfLiteType type = GetType(context, inputs[0]);
+      name += GetTypeSuffix(type);
+    } else {
+      // When there is a different input type, all types are specified.
+      for (int index : inputs) {
+        TfLiteType type = GetType(context, inputs[index]);
+        name += GetTypeSuffix(type);
+      }
+    }
+    return name;
+  }
+
+  // Holds the indices of the input/output tensors.
+  // inputs_[i] is list of all input tensors to node at index 'i'.
+  // outputs_[i] is list of all output tensors to node at index 'i'.
+  std::vector<std::vector<int>> inputs_, outputs_;
+  // Holds the builtin code of the ops.
+  // builtin_code_[i] is the type of node at index 'i'
+  std::vector<int> builtin_code_;
+
   const TfLiteIreeDelegateOptions options_;
   iree_runtime_instance_options_t iree_runtime_instance_options_;
   iree_runtime_instance_t* iree_runtime_instance_ = nullptr;
@@ -131,6 +240,7 @@ class IreeDelegate : public SimpleDelegateInterface {
                                  TfLiteContext* context) const override {
     // TODO: check inputs
     switch (registration->builtin_code) {
+      case kTfLiteBuiltinStablehloAdd:
       case kTfLiteBuiltinAdd: {
         if (node->inputs->size != 2) return false;
         if (node->outputs->size != 1) return false;
