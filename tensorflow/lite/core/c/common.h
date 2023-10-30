@@ -857,6 +857,10 @@ typedef struct TfLiteContext {
   /// eigen.
   int recommended_num_threads;
 
+  // FIXME: need a design discussion
+  const void* delegate_data;
+  size_t delegate_data_size;
+
   /// Access external contexts by type.
   ///
   /// WARNING: This is an experimental interface that is subject to change.

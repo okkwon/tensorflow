@@ -924,16 +924,6 @@ cc_library(
 )
 
 cc_library(
-    name = "tflite_with_iree_enabled",
-    compatible_with = get_compatible_with_portable(),
-    defines = ["TFLITE_BUILD_WITH_IREE_DELEGATE"],
-    visibility = ["//visibility:private"],
-    deps = [
-        "//tensorflow/lite/delegates/iree:iree_delegate",
-    ],
-)
-
-cc_library(
     name = "tflite_with_xnnpack_default",
     compatible_with = get_compatible_with_portable(),
     visibility = ["//visibility:private"],
@@ -965,6 +955,78 @@ cc_library(
         "//conditions:default": [
             ":tflite_with_xnnpack_default",
             "//tensorflow/lite/delegates/xnnpack:xnnpack_delegate_hdrs_only",
+        ],
+    }),
+)
+
+# Link this library to inject IREE delegate to TFLite runtime automatically
+# by utilizing the weak symbols if they're supported by the platform.
+cc_library(
+    name = "tflite_with_iree",
+    srcs = ["tflite_with_iree.cc"],
+    copts = tflite_copts() + tflite_copts_warnings(),
+    linkstatic = True,
+    deps = [
+        "//tensorflow/lite/core/c:common",
+        "//tensorflow/lite/delegates/iree:iree_delegate",
+    ],
+    alwayslink = 1,
+)
+
+# Enables applying IREE delegate for float models in TFLite runtime.
+# WARNING: This build flag is experimental and subject to change.
+config_setting(
+    name = "tflite_with_iree_explicit_true",
+    define_values = {"tflite_with_iree": "true"},
+)
+
+config_setting(
+    name = "tflite_with_iree_explicit_false",
+    define_values = {"tflite_with_iree": "false"},
+)
+
+cc_library(
+    name = "tflite_with_iree_enabled",
+    compatible_with = get_compatible_with_portable(),
+    defines = ["TFLITE_BUILD_WITH_IREE_DELEGATE"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//tensorflow/lite/delegates/iree:iree_delegate",
+    ],
+)
+
+cc_library(
+    name = "tflite_with_iree_default",
+    compatible_with = get_compatible_with_portable(),
+    visibility = ["//visibility:private"],
+    # Note: adding ":tflite_with_iree_enabled" to the values of following
+    # configuration conditions will make TFLite interpreter to apply IREE
+    # delegate by default.
+    deps = [
+        ":tflite_with_iree_enabled",
+    ],
+)
+
+cc_library(
+    name = "tflite_with_iree_optional",
+    srcs = ["tflite_with_iree_optional.cc"],
+    hdrs = [
+        "tflite_with_iree_optional.h",
+        "//tensorflow/lite/core:macros.h",
+    ],
+    compatible_with = get_compatible_with_portable(),
+    copts = tflite_copts() + tflite_copts_warnings(),
+    deps = [
+        "//tensorflow/lite/core/c:common",
+    ] + select({
+        ":tflite_with_iree_explicit_true": [
+            ":tflite_with_iree_enabled",
+            "//tensorflow/lite/delegates/iree:iree_delegate",
+        ],
+        ":tflite_with_iree_explicit_false": [],
+        "//conditions:default": [
+            ":tflite_with_iree_default",
+            "//tensorflow/lite/delegates/iree:iree_delegate",
         ],
     }),
 )

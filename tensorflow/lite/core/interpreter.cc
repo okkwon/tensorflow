@@ -318,6 +318,25 @@ TfLiteStatus Interpreter::SetNumThreads(int num_threads) {
   return kTfLiteOk;
 }
 
+TfLiteStatus Interpreter::SetDelegateData(const void* data, size_t size) {
+  if ((data != nullptr && size == 0) || (data == nullptr && size > 0)) {
+    return kTfLiteError;
+  }
+  for (auto& subgraph : subgraphs_) {
+    subgraph->context()->delegate_data = data;
+    subgraph->context()->delegate_data_size = size;
+  }
+
+  for (int i = 0; i < kTfLiteMaxExternalContexts; ++i) {
+    auto* c = external_contexts_[i];
+    if (c && c->Refresh) {
+      c->Refresh(context_);
+    }
+  }
+
+  return kTfLiteOk;
+}
+
 TfLiteStatus Interpreter::ApplyLazyDelegateProviders() {
   if (lazy_delegate_providers_.empty() || IsFullyDelegated()) return kTfLiteOk;
 

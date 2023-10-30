@@ -22,7 +22,7 @@ package_group(
     packages = [
         "//learning/brain/experimental/mlir/tflite/tfmrt/...",
         "//learning/brain/mlir/...",
-        "//third_party/iree/...",
+        "//iree_core/...",
         "//tensorflow/compiler/mlir/...",
         "//tensorflow/lite/python/...",
         "//waymo/ml/compiler/mlir/...",
@@ -629,6 +629,34 @@ tf_cc_test(
 )
 
 cc_library(
+    name = "emit_iree_vmfb",
+    srcs = ["transforms/emit_iree_vmfb.cc"],
+    hdrs = ["transforms/emit_iree_vmfb.h"],
+    data = [
+#        "@iree_core//lib:libIREECompiler.so",
+#        "//third_party/py/iree/tools/core:iree-lld",
+    ],
+    deps = [
+        ":empty_passes",
+        ":stateful_ops_utils",
+        ":tensorflow_lite",
+        "//tensorflow/compiler/mlir/lite/stablehlo:stablehlo_util",
+        "//tensorflow/compiler/tf2xla:functionalize_control_flow_pass_registration",
+        "//tensorflow/core:ops",
+        "//tensorflow/lite:builtin_ops",
+        "@local_tsl//tsl/platform:path",
+        "@iree_core//compiler/bindings/c:headers",
+        "@iree_core//compiler/bindings/c:loader",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@stablehlo//:stablehlo_ops",
+    ],
+)
+
+cc_library(
     name = "tensorflow_lite_legalize_tf",
     srcs = [
         "transforms/analyze_variables.cc",
@@ -1043,6 +1071,7 @@ cc_library(
         ":stateful_ops_utils",
         ":tensorflow_lite",
         "//tensorflow/compiler/mlir:op_or_arg_name_mapper",
+        "//tensorflow/compiler/mlir/lite:emit_iree_vmfb",
         "//tensorflow/compiler/mlir/lite/metrics:error_collector_inst",
         "//tensorflow/compiler/mlir/lite/quantization/ir:QuantOps",
         "//tensorflow/compiler/mlir/tensorflow",
@@ -1360,6 +1389,7 @@ cc_library(
         ":tensorflow_lite",
         ":tf_tfl_passes",
         "//tensorflow/cc/saved_model:loader",
+        "//tensorflow/compiler/mlir/lite:emit_iree_vmfb",
         "//tensorflow/compiler/mlir/lite/debug",
         "//tensorflow/compiler/mlir/lite/metrics:error_collector_inst",
         "//tensorflow/compiler/mlir/lite/quantization:quantization_config",

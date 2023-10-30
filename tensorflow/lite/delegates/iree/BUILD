@@ -15,7 +15,8 @@ cc_library(
     hdrs = ["iree_runtime_call.h"],
     deps = [
         "@iree_core//runtime/src/iree/runtime",
-         "//tensorflow/lite/core/c:common",
+        "//tensorflow/lite/c:c_api_types",
+        "//tensorflow/lite/core/c:common",
     ],
 )
 
@@ -23,34 +24,20 @@ cc_library(
     name = "iree_delegate",
     srcs = [
         "iree_delegate.cc",
-        "iree_runtime_call.c",
     ],
     hdrs = [
         "iree_delegate.h",
     ],
     deps = [
         ":iree_runtime_call",
+        "@iree_core//runtime/src/iree/runtime:impl",
+        "//tensorflow/lite:builtin_ops",
+        "//tensorflow/lite/c:c_api_types",
+        "//tensorflow/lite/c:common",        
         "//tensorflow/lite/core/c:common",
         "//tensorflow/lite/delegates/utils:simple_delegate",
     ],
 )
-
-#cc_binary(
-#    name = "iree_external_delegate.so",
-#    srcs = [
-#        "external_delegate_adaptor.cc",
-#    ],
-#    defines = ["TFL_EXTERNAL_DELEGATE_COMPILE_LIBRARY"],
-#    linkshared = 1,
-#    linkstatic = 1,
-#    deps = [
-#        ":iree_delegate",
-#        "//tensorflow/lite/core/c:common",
-#        "//tensorflow/lite/delegates/external:external_delegate_interface",
-#        "//tensorflow/lite/tools:command_line_flags",
-#        "//tensorflow/lite/tools:logging",
-#    ],
-#)
 
 ################################ Tester classes ################################
 

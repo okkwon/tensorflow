@@ -41,6 +41,7 @@ cc_library(
     ] + builtin_ops_visibility_allowlist(),
     deps = [
         "//tensorflow/lite:mutable_op_resolver",
+        "//tensorflow/lite:tflite_with_iree_optional",
         "//tensorflow/lite:tflite_with_xnnpack_optional",
         "//tensorflow/lite/core:cc_api_stable",
         "//tensorflow/lite/core/c:common",
@@ -64,6 +65,7 @@ cc_library(
     ],
     deps = [
         "//tensorflow/lite:framework_stable",
+        "//tensorflow/lite:tflite_with_iree_optional",
         "//tensorflow/lite:tflite_with_xnnpack_optional",
         "//tensorflow/lite/core:cc_api_stable",
         "//tensorflow/lite/core/c:common",

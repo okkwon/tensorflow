@@ -82,6 +82,7 @@ limitations under the License.
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 #include "tensorflow/compiler/mlir/lite/metrics/error_collector_inst.h"
 #include "tensorflow/compiler/mlir/lite/quantization/ir/QuantOps.h"
+#include "tensorflow/compiler/mlir/lite/transforms/emit_iree_vmfb.h"
 #include "tensorflow/compiler/mlir/lite/utils/convert_type.h"
 #include "tensorflow/compiler/mlir/lite/utils/low_bit_utils.h"
 #include "tensorflow/compiler/mlir/lite/utils/stateful_ops_utils.h"
@@ -578,6 +579,7 @@ class Translator {
         ->getOrLoadDialect<mlir::tf_executor::TensorFlowExecutorDialect>();
   }
 
+  std::vector<mlir::Operation*> unsupported_ops_;
   std::optional<std::string> TranslateInternal();
 
   // Returns TFLite buffer populated with constant value if the operation is
@@ -683,6 +685,9 @@ class Translator {
   // Builds and returns list of tfl.SignatureDef sections in the model.
   std::optional<VectorBufferOffset<BufferOffset<tflite::SignatureDef>>>
   CreateSignatureDefs(const std::vector<SignatureDefData>& signature_defs);
+
+  // Encodes extra data for delegate.
+  std::optional<VectorBufferOffset<uint8_t>> CreateDelegateData();
 
   // Returns list of offsets for the passed 'items' in TensorMap structure
   // inside the flatbuffer.
@@ -1653,6 +1658,10 @@ std::optional<BufferOffset<tflite::Operator>> Translator::BuildOperator(
 
     std::string op_name = inst->getName().getStringRef().str();
     uint32_t opcode_index = GetOpcodeIndex(op_name, *builtin_code);
+
+    if (mlir::TFL::IsUnsupportedOp(inst)) {
+      unsupported_ops_.push_back(inst);
+    }
 
     // If this is TransposeConv we need to do a special case of ignoring the
     // optional tensor, to allow newly created models to run on old runtimes.
@@ -2794,6 +2803,23 @@ Translator::CreateSignatureDefs(
   return builder_.CreateVector(signature_defs_buffer);
 }
 
+std::optional<VectorBufferOffset<uint8_t>> Translator::CreateDelegateData() {
+  if (unsupported_ops_.empty()) return std::nullopt;
+
+  std::vector<std::string> compiler_args = {
+      "--iree-hal-target-backends=llvm-cpu",
+      "--iree-input-demote-i64-to-i32=false",
+      "--iree-input-demote-f64-to-f32=false",
+  };
+
+  struct mlir::TFL::IREECompiler iree_compiler(std::move(compiler_args));
+  iree_compiler.Run(unsupported_ops_);
+  auto result =
+      builder_.CreateVector((const unsigned char*)iree_compiler.GetVMFBBuffer(),
+                            iree_compiler.GetVMFBBufferSize());
+  return result;
+}
+
 bool UpdateEntryFunction(ModuleOp module) {
   if (module.lookupSymbol<FuncOp>("main") != nullptr) {
     // We already have an entry function.
@@ -3061,12 +3087,14 @@ std::optional<std::string> Translator::TranslateInternal() {
     ++subgraph_index;
   }
   auto signature_defs = CreateSignatureDefs(signature_defs_vec);
+  auto delegate_data = CreateDelegateData();
 
-  auto model = tflite::CreateModel(builder_, TFLITE_SCHEMA_VERSION,
-                                   builder_.CreateVector(opcodes_),
-                                   builder_.CreateVector(subgraphs_),
-                                   description, builder_.CreateVector(buffers_),
-                                   metadata_buffer, *metadata, *signature_defs);
+  auto model = tflite::CreateModel(
+      builder_, TFLITE_SCHEMA_VERSION, builder_.CreateVector(opcodes_),
+      builder_.CreateVector(subgraphs_), description,
+      builder_.CreateVector(buffers_), metadata_buffer, *metadata,
+      *signature_defs, delegate_data.has_value() ? *delegate_data : 0);
+
   tflite::FinishModelBuffer(builder_, model);
   // There is a limit of 2GB for a flatbuffer.
   bool flatbuffer_limit_exceeded = builder_.GetSize() > flatbuffer_size_max;

@@ -528,6 +528,9 @@ class Interpreter {
   /// `InterpreterBuilder::SetNumThreads`, as documented above.
   TfLiteStatus SetNumThreads(int num_threads);
 
+  // FIXME: documentation
+  TfLiteStatus SetDelegateData(const void* data, size_t size);
+
   /// Allow float16 precision for FP32 calculation when possible.
   /// Default: not allow.
   ///

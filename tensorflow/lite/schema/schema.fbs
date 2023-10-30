@@ -1637,6 +1637,9 @@ table Model {
 
   // Optional SignatureDefs for the model.
   signature_defs:[SignatureDef];
+
+  // Optional extra data for delegate
+  delegate_data:[ubyte];
 }
 
 root_type Model;

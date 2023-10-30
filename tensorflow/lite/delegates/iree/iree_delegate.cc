@@ -24,8 +24,6 @@ limitations under the License.
 #include "tensorflow/lite/delegates/iree/iree_runtime_call.h"
 #include "tensorflow/lite/delegates/utils/simple_delegate.h"
 
-constexpr char kVMFBPath[] = "VMFB_PATH";
-
 namespace tflite {
 namespace iree_test {
 
@@ -42,15 +40,6 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
 
   TfLiteStatus Init(TfLiteContext* context,
                     const TfLiteDelegateParams* params) override {
-    module_path_cstr_ = std::getenv(kVMFBPath);
-    if (!module_path_cstr_) {
-      return kTfLiteError;
-    }
-
-#ifndef NDEBUG
-    printf("VMFB_PATH = %s\n", module_path_cstr_);
-#endif
-
     // Set up the shared runtime instance.
     // An application should usually only have one of these and share it across
     // all of the sessions it has. The instance is thread-safe, while the
@@ -89,6 +78,14 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     // Load the compiled user module in a demo-specific way.
     // Applications could specify files, embed the outputs directly in their
     // binaries, fetch them over the network, etc.
+    // The lifetime of the delegate data in the context can be disjoint from
+    // the lifetime of the delegate, so it is safe to copy it here.
+    vmfb_content_.resize(context->delegate_data_size);
+    memcpy(vmfb_content_.data(), context->delegate_data,
+           context->delegate_data_size);
+    iree_const_byte_span_t vmfb_data =
+        iree_make_const_byte_span(vmfb_content_.data(), vmfb_content_.size());
+
     if (iree_status_is_ok(status)) {
       status = iree_runtime_session_append_bytecode_module_from_file(
           iree_runtime_session_, module_path_cstr_);
@@ -227,6 +224,7 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   iree_runtime_session_t* iree_runtime_session_ = nullptr;
   iree_runtime_session_options_t iree_runtime_session_options_;
   const char* module_path_cstr_ = nullptr;
+  std::vector<unsigned char> vmfb_content_;
 };
 
 // IreeDelegate implements the interface of SimpleDelegateInterface.
@@ -252,7 +250,21 @@ class IreeDelegate : public SimpleDelegateInterface {
     return false;
   }
 
-  TfLiteStatus Initialize(TfLiteContext* context) override { return kTfLiteOk; }
+  TfLiteStatus Initialize(TfLiteContext* context) override {
+    if (context->delegate_data == nullptr || context->delegate_data_size == 0) {
+      return kTfLiteError;
+    }
+#ifndef NDEBUG
+    fprintf(stderr,
+            "IreeDelegate::Initialize(): vmfb module size = %zu bytes\n",
+            context->delegate_data_size);
+
+#endif
+
+    // TODO: move the module loading here.
+
+    return kTfLiteOk;
+  }
 
   const char* Name() const override {
     static constexpr char kName[] = "IreeDelegate";

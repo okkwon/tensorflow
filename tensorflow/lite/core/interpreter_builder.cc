@@ -821,6 +821,15 @@ TfLiteStatus InterpreterBuilder::operator()(
   // Set num threads after all the subgraphs are added.
   (*interpreter)->SetNumThreads(num_threads_);
 
+  // Set extra delegate data.
+  auto* delegate_data = model_->delegate_data();
+  if (delegate_data) {
+    (*interpreter)
+        ->SetDelegateData(delegate_data->data(), delegate_data->size());
+  } else {
+    (*interpreter)->SetDelegateData(nullptr, 0);
+  }
+
   // Set Interpreter options
   (*interpreter)->ApplyOptionsImpl(&options_);
 
