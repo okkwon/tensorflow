@@ -27,8 +27,8 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-#include "absl/strings/escaping.h"
 #include "Eigen/Core"  // from @eigen_archive
+#include "absl/strings/escaping.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -40,24 +40,24 @@ limitations under the License.
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"  // from @llvm-project
-#include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
-#include "mlir/IR/Attributes.h"  // from @llvm-project
-#include "mlir/IR/Builders.h"  // from @llvm-project
-#include "mlir/IR/BuiltinAttributes.h"  // from @llvm-project
-#include "mlir/IR/BuiltinTypes.h"  // from @llvm-project
-#include "mlir/IR/Location.h"  // from @llvm-project
-#include "mlir/IR/MLIRContext.h"  // from @llvm-project
-#include "mlir/IR/Matchers.h"  // from @llvm-project
-#include "mlir/IR/OpImplementation.h"  // from @llvm-project
-#include "mlir/IR/PatternMatch.h"  // from @llvm-project
-#include "mlir/IR/TypeUtilities.h"  // from @llvm-project
-#include "mlir/IR/Types.h"  // from @llvm-project
-#include "mlir/Support/LLVM.h"  // from @llvm-project
-#include "mlir/Support/LogicalResult.h"  // from @llvm-project
-#include "mlir/Transforms/FoldUtils.h"  // from @llvm-project
+#include "mlir/Dialect/Arith/IR/Arith.h"    // from @llvm-project
+#include "mlir/Dialect/Func/IR/FuncOps.h"   // from @llvm-project
+#include "mlir/IR/Attributes.h"             // from @llvm-project
+#include "mlir/IR/Builders.h"               // from @llvm-project
+#include "mlir/IR/BuiltinAttributes.h"      // from @llvm-project
+#include "mlir/IR/BuiltinTypes.h"           // from @llvm-project
+#include "mlir/IR/Location.h"               // from @llvm-project
+#include "mlir/IR/MLIRContext.h"            // from @llvm-project
+#include "mlir/IR/Matchers.h"               // from @llvm-project
+#include "mlir/IR/OpImplementation.h"       // from @llvm-project
+#include "mlir/IR/PatternMatch.h"           // from @llvm-project
+#include "mlir/IR/TypeUtilities.h"          // from @llvm-project
+#include "mlir/IR/Types.h"                  // from @llvm-project
+#include "mlir/Support/LLVM.h"              // from @llvm-project
+#include "mlir/Support/LogicalResult.h"     // from @llvm-project
+#include "mlir/Transforms/FoldUtils.h"      // from @llvm-project
 #include "mlir/Transforms/InliningUtils.h"  // from @llvm-project
-#include "mlir/Transforms/RegionUtils.h"  // from @llvm-project
+#include "mlir/Transforms/RegionUtils.h"    // from @llvm-project
 #include "tensorflow/compiler/mlir/lite/utils/arithmetic_count_util.h"
 #include "tensorflow/compiler/mlir/lite/utils/size_utils.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_op_interfaces.h"
@@ -294,6 +294,24 @@ bool IsI64Type(Type element_type) {
   return element_type.isInteger(64) && !element_type.isUnsignedInteger();
 }
 
+// Return true when the given element_type is Complex<F32>
+bool IsComplexF32Type(Type element_type) {
+  if (auto complex_type = element_type.cast<ComplexType>()) {
+    return complex_type.getElementType().isF32();
+  } else {
+    return false;
+  }
+}
+
+// Return true when the given element_type is Complex<F64>
+bool IsComplexF64Type(Type element_type) {
+  if (auto complex_type = element_type.cast<ComplexType>()) {
+    return complex_type.getElementType().isF64();
+  } else {
+    return false;
+  }
+}
+
 // Return true if the value is a splat tensor constant zero.
 bool EqualsZero(Value value) {
   DenseElementsAttr constant;
@@ -340,6 +358,16 @@ bool VerifyAddOpShapeConstraints(AddOp op) {
   if (element_type.isF32() || IsQI8Type(element_type) ||
       IsQUI8Type(element_type) || IsI16Type(element_type) ||
       IsI32Type(element_type) || IsI64Type(element_type)) {
+    return VerifyOperandsHaveSameShapesOrBroadcastableShape(
+        /*op=*/op.getOperation(), /*indices=*/ArrayRef<unsigned>{0, 1},
+        /*max_bcast_rank=*/6);
+  }
+
+  // Temporarily allow these types for the IREE delegate.
+  if (element_type.isF16() || element_type.isF64() ||
+      element_type.isInteger(8) || element_type.isInteger(16) ||
+      element_type.isInteger(32) || element_type.isInteger(64) ||
+      IsComplexF32Type(element_type) || IsComplexF64Type(element_type)) {
     return VerifyOperandsHaveSameShapesOrBroadcastableShape(
         /*op=*/op.getOperation(), /*indices=*/ArrayRef<unsigned>{0, 1},
         /*max_bcast_rank=*/6);
