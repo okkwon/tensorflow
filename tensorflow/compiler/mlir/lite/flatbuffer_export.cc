@@ -2810,6 +2810,7 @@ std::optional<VectorBufferOffset<uint8_t>> Translator::CreateDelegateData() {
       "--iree-hal-target-backends=llvm-cpu",
       "--iree-input-demote-i64-to-i32=false",
       "--iree-input-demote-f64-to-f32=false",
+      "--iree-opt-demote-f64-to-f32=false",
   };
 
   struct mlir::TFL::IREECompiler iree_compiler(std::move(compiler_args));

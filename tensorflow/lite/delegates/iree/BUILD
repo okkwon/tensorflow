@@ -30,6 +30,7 @@ cc_library(
     ],
     deps = [
         ":iree_runtime_call",
+        "@com_google_absl//absl/log",
         "@iree_core//runtime/src/iree/runtime:impl",
         "//tensorflow/lite:builtin_ops",
         "//tensorflow/lite/c:c_api_types",

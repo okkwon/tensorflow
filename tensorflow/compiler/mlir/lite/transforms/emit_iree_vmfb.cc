@@ -273,25 +273,30 @@ std::string IREECompiler::CreateFunctionBody(mlir::Operation* op,
 }
 
 bool IREECompiler::Initialize() {
+  static bool is_compiler_lib_loaded = false;
+
   LOG(INFO) << "Initialize()";
+  if (!is_compiler_lib_loaded) {
 #if 0  // google3
-  std::string loader_path = devtools_build::GetRunfilesDir() +
-                            "/google3/third_party/py/iree/tools/core/iree-lld";
-  setenv("IREE_LLVM_EMBEDDED_LINKER_PATH", loader_path.c_str(),
-         /*overwrite=*/0);
-  std::string iree_lib_path =
+    std::string loader_path = devtools_build::GetRunfilesDir() +
+      "/google3/third_party/py/iree/tools/core/iree-lld";
+    setenv("IREE_LLVM_EMBEDDED_LINKER_PATH", loader_path.c_str(),
+           /*overwrite=*/0);
+    std::string iree_lib_path =
       devtools_build::GetRunfilesDir() +
       "/google3/third_party/iree/lib/libIREECompiler.so";
-  const char* compiler_lib_path = iree_lib_path.c_str();
+    const char* compiler_lib_path = iree_lib_path.c_str();
 #else
-  const char* compiler_lib_path = getenv("LIB_IREE_COMPILER_PATH");
-  if (compiler_lib_path == nullptr) {
-    LOG(ERROR) << "LIB_IREE_COMPILER_PATH is not set.";
-  }
+    const char* compiler_lib_path = getenv("LIB_IREE_COMPILER_PATH");
+    if (compiler_lib_path == nullptr) {
+      LOG(ERROR) << "LIB_IREE_COMPILER_PATH is not set.";
+    }
 #endif
-  if (!ireeCompilerLoadLibrary(compiler_lib_path)) {
-    LOG(ERROR) << "Failed to load libIREECompiler lib: " << compiler_lib_path;
-    return false;
+    if (!ireeCompilerLoadLibrary(compiler_lib_path)) {
+      LOG(ERROR) << "Failed to load libIREECompiler lib: " << compiler_lib_path;
+      return false;
+    }
+    is_compiler_lib_loaded = true;
   }
   ireeCompilerGlobalInitialize();
   return true;

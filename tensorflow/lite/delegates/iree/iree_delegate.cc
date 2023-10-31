@@ -1,3 +1,4 @@
+
 /* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +15,15 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/delegates/iree/iree_delegate.h"
 
-#include <cstdio>
-#include <cstdlib>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "tensorflow/lite/builtin_ops.h"
+#include "tensorflow/lite/c/c_api_types.h"
+#include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/delegates/iree/iree_runtime_call.h"
 #include "tensorflow/lite/delegates/utils/simple_delegate.h"
 
@@ -33,13 +36,15 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
   explicit IreeDelegateKernel(const TfLiteIreeDelegateOptions& options)
       : options_(options) {}
 
-  virtual ~IreeDelegateKernel() {
+  ~IreeDelegateKernel() override {
     iree_runtime_session_release(iree_runtime_session_);
     iree_runtime_instance_release(iree_runtime_instance_);
   }
 
   TfLiteStatus Init(TfLiteContext* context,
                     const TfLiteDelegateParams* params) override {
+    // TODO: move the module loading into the delegate init.
+
     // Set up the shared runtime instance.
     // An application should usually only have one of these and share it across
     // all of the sessions it has. The instance is thread-safe, while the
@@ -47,17 +52,27 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     iree_runtime_instance_options_initialize(&iree_runtime_instance_options_);
     iree_runtime_instance_options_use_all_available_drivers(
         &iree_runtime_instance_options_);
-    iree_runtime_instance_ = NULL;
+    iree_runtime_instance_ = nullptr;
     iree_status_t status = iree_runtime_instance_create(
         &iree_runtime_instance_options_, iree_allocator_system(),
         &iree_runtime_instance_);
 
     iree_hal_device_t* iree_device = nullptr;
 
-    if (iree_status_is_ok(status)) {
-      status = iree_runtime_instance_try_create_default_device(
-          iree_runtime_instance_, iree_make_cstring_view("local-task"),
-          &iree_device);
+    if (!iree_status_is_ok(status)) {
+      LOG(ERROR) << "iree_runtime_instance_create failed: "
+                 << iree_status_code_string(iree_status_code(status));
+      return kTfLiteError;
+    }
+
+    status = iree_runtime_instance_try_create_default_device(
+        iree_runtime_instance_, iree_make_cstring_view("local-task"),
+        &iree_device);
+
+    if (!iree_status_is_ok(status)) {
+      LOG(ERROR) << "iree_runtime_instance_try_create_default_device failed: "
+                 << iree_status_code_string(iree_status_code(status));
+      return kTfLiteError;
     }
 
     // Set up the session to run the module.
@@ -65,15 +80,13 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     // each other and hold runtime state such as the variables used within the
     // module. The same module loaded into two sessions will see their own
     // private state.
-    if (iree_status_is_ok(status)) {
-      iree_runtime_session_options_initialize(&iree_runtime_session_options_);
-      iree_status_t status = iree_runtime_session_create_with_device(
-          iree_runtime_instance_, &iree_runtime_session_options_, iree_device,
-          iree_runtime_instance_host_allocator(iree_runtime_instance_),
-          &iree_runtime_session_);
-      // Session keeps device reference internally.
-      iree_hal_device_release(iree_device);
-    }
+    iree_runtime_session_options_initialize(&iree_runtime_session_options_);
+    /* iree_status_t status = */ iree_runtime_session_create_with_device(
+        iree_runtime_instance_, &iree_runtime_session_options_, iree_device,
+        iree_runtime_instance_host_allocator(iree_runtime_instance_),
+        &iree_runtime_session_);
+    // Session keeps device reference internally.
+    iree_hal_device_release(iree_device);
 
     // Load the compiled user module in a demo-specific way.
     // Applications could specify files, embed the outputs directly in their
@@ -86,13 +99,17 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     iree_const_byte_span_t vmfb_data =
         iree_make_const_byte_span(vmfb_content_.data(), vmfb_content_.size());
 
-    if (iree_status_is_ok(status)) {
-      status = iree_runtime_session_append_bytecode_module_from_file(
-          iree_runtime_session_, module_path_cstr_);
+    status = iree_runtime_session_append_bytecode_module_from_memory(
+        iree_runtime_session_, vmfb_data, iree_allocator_null());
+
+    if (!iree_status_is_ok(status)) {
+      LOG(ERROR) << "iree_runtime_session_append_bytecode_module_from_memory() "
+                 << "failed : "
+                 << iree_status_code_string(iree_status_code(status));
+      return kTfLiteError;
     }
 
     // Build and issue the call.
-    if (!iree_status_is_ok(status)) return kTfLiteError;
 
     // Save index to all nodes which are part of this delegate.
     inputs_.resize(params->nodes_to_replace->size);
@@ -141,13 +158,21 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
       // FIXME: get the function name from the TF op.
       std::string function_name_str =
           GetFunctionName(context, builtin_code_[i], inputs_[i], outputs_[i]);
+
+      LOG(INFO) << "Eval() function : " << function_name_str;
+
       iree_string_view_t function_name =
           iree_make_cstring_view(function_name_str.c_str());
 
       iree_status_t status = iree_runtime_call_function(
           iree_runtime_session_, function_name, context, node);
 
-      if (!iree_status_is_ok(status)) return kTfLiteError;
+      if (!iree_status_is_ok(status)) {
+        LOG(ERROR) << "iree_runtime_call_function failed: "
+                   << iree_status_code_string(iree_status_code(status));
+        return kTfLiteError;
+      }
+      LOG(INFO) << "Eval done()";
     }
     return kTfLiteOk;
   }
@@ -175,8 +200,44 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
 
   std::string GetTypeSuffix(TfLiteType type) {
     switch (type) {
+      case kTfLiteNoType:
+        return "notype";
       case kTfLiteFloat32:
-        return "_f32";
+        return "f32";
+      case kTfLiteInt32:
+        return "i32";
+      case kTfLiteUInt8:
+        return "ui8";
+      case kTfLiteInt64:
+        return "i64";
+      case kTfLiteString:
+        return "str";
+      case kTfLiteBool:
+        return "bool";
+      case kTfLiteInt16:
+        return "i16";
+      case kTfLiteComplex64:
+        return "complex64";
+      case kTfLiteInt8:
+        return "i8";
+      case kTfLiteFloat16:
+        return "f16";
+      case kTfLiteFloat64:
+        return "f64";
+      case kTfLiteComplex128:
+        return "complex128";
+      case kTfLiteUInt64:
+        return "ui64";
+      case kTfLiteResource:
+        return "resource";
+      case kTfLiteVariant:
+        return "variant";
+      case kTfLiteUInt32:
+        return "ui32";
+      case kTfLiteUInt16:
+        return "ui16";
+      case kTfLiteInt4:
+        return "i4";
       default:
         return "";
     }
@@ -189,11 +250,24 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
     switch (builtin_code) {
       case kTfLiteBuiltinAdd:
       case kTfLiteBuiltinStablehloAdd:
-        name += "add_4d";
+        name += "add";
         break;
       default:
         return "";
     }
+
+#if 1
+    for (int index : inputs) {
+      name += "_";
+      TfLiteTensor* tensor = &context->tensors[index];
+      TfLiteType type = tensor->type;
+      for (int i = 0; i < tensor->dims->size; ++i) {
+        name += std::to_string(tensor->dims->data[i]);
+        name += "x";
+      }
+      name += GetTypeSuffix(type);
+    }
+#else
     // Handle the type. When all the input types are the same, the type is
     // specified once in the function name. Otherwise, all types are
     // specified.
@@ -207,6 +281,7 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
         name += GetTypeSuffix(type);
       }
     }
+#endif
     return name;
   }
 
@@ -238,13 +313,14 @@ class IreeDelegate : public SimpleDelegateInterface {
                                  TfLiteContext* context) const override {
     // TODO: check inputs
     switch (registration->builtin_code) {
-      case kTfLiteBuiltinStablehloAdd:
-      case kTfLiteBuiltinAdd: {
-        if (node->inputs->size != 2) return false;
-        if (node->outputs->size != 1) return false;
+      case kTfLiteBuiltinAdd:
+        // case kTfLiteBuiltinStablehloAdd:
+        {
+          if (node->inputs->size != 2) return false;
+          if (node->outputs->size != 1) return false;
 
-        return true;
-      }
+          return true;
+        }
     }
     // TODO: implement
     return false;
@@ -254,12 +330,8 @@ class IreeDelegate : public SimpleDelegateInterface {
     if (context->delegate_data == nullptr || context->delegate_data_size == 0) {
       return kTfLiteError;
     }
-#ifndef NDEBUG
-    fprintf(stderr,
-            "IreeDelegate::Initialize(): vmfb module size = %zu bytes\n",
-            context->delegate_data_size);
-
-#endif
+    LOG(INFO) << "IreeDelegate::Initialize(): vmfb module size = "
+              << context->delegate_data_size << " bytes";
 
     // TODO: move the module loading here.
 

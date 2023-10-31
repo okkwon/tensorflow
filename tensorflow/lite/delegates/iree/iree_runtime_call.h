@@ -1,4 +1,4 @@
-/* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2023 The TensorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
-#define TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
+#ifndef TENSORFLOW_LITE_DELEGATES_IREE_IREE_RUNTIME_CALL_H_
+#define TENSORFLOW_LITE_DELEGATES_IREE_IREE_RUNTIME_CALL_H_
 
 #include "iree/runtime/api.h"
 #include "tensorflow/lite/core/c/common.h"
@@ -32,4 +32,4 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
 }
 #endif  // __cplusplus
 
-#endif  // TENSORFLOW_LITE_DELEGATES_IREE_RUNTIME_CALL_H_
+#endif  // TENSORFLOW_LITE_DELEGATES_IREE_IREE_RUNTIME_CALL_H_
