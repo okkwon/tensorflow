@@ -33,7 +33,7 @@ static iree_hal_element_type_t get_hal_elem_type(TfLiteType t) {
     case kTfLiteInt32:
       return IREE_HAL_ELEMENT_TYPE_INT_32;
     case kTfLiteUInt8:
-      return IREE_HAL_ELEMENT_TYPE_UINT_32;
+      return IREE_HAL_ELEMENT_TYPE_UINT_8;
     case kTfLiteInt64:
       return IREE_HAL_ELEMENT_TYPE_INT_64;
     case kTfLiteBool:
