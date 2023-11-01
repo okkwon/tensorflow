@@ -195,13 +195,15 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
       fprintf(stdout, "\n");
     }
 #endif  // PRINT_VALUES
-    // The function allocates the output buffer and the buffer view, but when
-    // the buffer view gets created it increments the buffer's reference count
-    // to 2. To deallocate the buffer along with the buffer view, we need to
-    // decrement it to 1.
-    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(ret_buffer_view);
-    iree_hal_buffer_release(buffer);
-    iree_hal_buffer_view_release(ret_buffer_view);
+    if (iree_status_is_ok(status)) {
+      // The function allocates the output buffer and the buffer view, but when
+      // the buffer view gets created it increments the buffer's reference count
+      // to 2. To deallocate the buffer along with the buffer view, we need to
+      // decrement it to 1.
+      iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(ret_buffer_view);
+      iree_hal_buffer_release(buffer);
+      iree_hal_buffer_view_release(ret_buffer_view);
+    }
   }
 
   iree_runtime_call_deinitialize(&call);
