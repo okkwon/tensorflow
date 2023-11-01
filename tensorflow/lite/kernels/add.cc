@@ -87,7 +87,6 @@ void Free(TfLiteContext* context, void* buffer) {
 
 TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   auto* params = reinterpret_cast<TfLiteAddParams*>(node->builtin_data);
-  OpData* data = reinterpret_cast<OpData*>(node->user_data);
 
   TF_LITE_ENSURE(context, params);
 
@@ -116,6 +115,8 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   } else {
     output_size = TfLiteIntArrayCopy(input1->dims);
   }
+#if 0
+  OpData* data = reinterpret_cast<OpData*>(node->user_data);
 
   // 8bit -> 8bit general quantized path, with general rescalings
   // as well as, int16 -> int16 with general rescalings
@@ -230,7 +231,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
         context, params->activation, output, &data->output_activation_min,
         &data->output_activation_max));
   }
-
+#endif
   return context->ResizeTensor(context, output, output_size);
 }
 
