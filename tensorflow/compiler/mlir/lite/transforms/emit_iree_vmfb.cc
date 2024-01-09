@@ -107,6 +107,9 @@ std::string GetFunctionName(mlir::Operation* op) {
   for (auto operand : op->getOperands()) {
     name += "_" + GetTypeStr(operand.getType());
   }
+  for (auto result : op->getResults()) {
+    name += "_" + GetTypeStr(result.getType());
+  }
   LOG(INFO) << "Function name: " << name;
   return name;
 }
@@ -129,7 +132,7 @@ void IREECompiler::InitializeOutputBuffer() { mlir_module_ = "module {\n"; }
 void IREECompiler::FinalizeOutputBuffer() { mlir_module_ += "}\n"; }
 
 void IREECompiler::Run(std::vector<mlir::Operation*>& ops) {
-  LOG(INFO) << "run()";
+  LOG(INFO) << "Run()";
   Initialize();
   CreateSession();
   InitializeOutputBuffer();
@@ -235,26 +238,53 @@ uint64_t IREECompiler::GetVMFBBufferSize() { return vmfb_buffer_size_; }
 
 std::string IREECompiler::CreateFunctionBody(mlir::Operation* op,
                                              std::string func_name) {
-  op->getContext()->loadDialect<func::FuncDialect>();
-  mlir::OpBuilder b(op->getContext());
+  // `inputs` and `outputs` are the inputs and outputs of the given subgraph.
+  // We are currently handling a subgraph with a single op, but it can be
+  // generalized.
+  std::vector<mlir::Value> inputs;
+  inputs.insert(inputs.end(), op->getOperands().begin(),
+                op->getOperands().end());
 
-  std::vector<mlir::Value> values;
+  std::vector<mlir::Value> outputs;
+  outputs.insert(outputs.end(), op->getResults().begin(),
+                 op->getResults().end());
+
+  // The function has operands for the outputs after the operands for the input.
+  std::vector<Type> input_types;
   std::vector<Type> output_types;
 
-  output_types.insert(output_types.end(), op->getResults().getTypes().begin(),
-                      op->getResults().getTypes().end());
-  values.insert(values.end(), op->getOperands().begin(),
-                op->getOperands().end());
-  FunctionType func_type =
-      b.getFunctionType(mlir::ValueRange(values), output_types);
+  for (auto input : inputs) {
+    input_types.push_back(input.getType());
+  }
+  for (auto output : outputs) {
+    input_types.push_back(output.getType());
+    output_types.push_back(output.getType());
+  }
+
+  op->getContext()->loadDialect<func::FuncDialect>();
+
+  mlir::OpBuilder b(op->getContext());
+
+  FunctionType func_type = b.getFunctionType(input_types, output_types);
   mlir::func::FuncOp func_op =
       mlir::func::FuncOp::create(op->getLoc(), func_name, func_type);
+
+  // attach iree.abi.output to the operands for output
+  auto* context = func_op.getContext();
+  auto iree_abi_output = StringAttr::get(op->getContext(), "iree.abi.output");
+  unsigned num_inputs = inputs.size();
+  auto index_type = IndexType::get(context);
+  for (unsigned int i = 0; i < outputs.size(); ++i) {
+    auto output_index = IntegerAttr::get(index_type, i);
+    NamedAttribute attr = {iree_abi_output, output_index};
+    func_op.setArgAttrs(num_inputs + i, attr);
+  }
 
   Block* entry_block = func_op.addEntryBlock();
   b.setInsertionPointToEnd(entry_block);
 
   IRMapping mapper;
-  for (const auto& arg : llvm::enumerate(values)) {
+  for (const auto& arg : llvm::enumerate(inputs)) {
     mapper.map(arg.value(), func_op.getArgument(arg.index()));
   }
   mlir::Operation* cloned_op = op->clone(mapper);

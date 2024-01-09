@@ -22,6 +22,27 @@ limitations under the License.
 
 #ifdef PRINT_VALUES
 #include <stdio.h>
+
+static void print_hex64(void* data, unsigned bytes) {
+  assert(bytes % 8 == 0);
+  unsigned num_elems = bytes / 8;
+  uint64_t* ptr = (uint64_t*)data;
+  for (unsigned i = 0; i < num_elems; ++i) {
+    fprintf(stderr, "0x%X ", ptr[i]);
+  }
+  fprintf(stderr, "\n");
+}
+
+static void print_f32(void* data, unsigned bytes) {
+  assert(bytes % 4 == 0);
+  unsigned num_elems = bytes / 4;
+  float* ptr = (float*)data;
+  for (unsigned i = 0; i < num_elems; ++i) {
+    fprintf(stderr, "%f ", ptr[i]);
+  }
+  fprintf(stderr, "\n");
+}
+
 #endif
 
 static iree_hal_element_type_t get_hal_elem_type(TfLiteType t) {
@@ -66,6 +87,97 @@ static iree_hal_element_type_t get_hal_elem_type(TfLiteType t) {
   }
 }
 
+static iree_status_t import_tfl_tensor_as_iree_buffer_view(
+    int tensor_index, TfLiteContext* context, iree_runtime_session_t* session,
+    iree_hal_buffer_view_t** buffer_view, bool is_write) {
+  iree_hal_allocator_t* device_allocator =
+      iree_runtime_session_device_allocator(session);
+  iree_allocator_t host_allocator =
+      iree_runtime_session_host_allocator(session);
+
+  iree_hal_dim_t arg_shape[MAX_TENSOR_DIMS] = {
+      1,
+  };
+  const TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
+
+  if (tf_tensor->dims->size > MAX_TENSOR_DIMS) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "only supports up to %lu dims but got %d",
+                            sizeof(arg_shape), tf_tensor->dims->size);
+  }
+
+  for (int dim = 0; dim < tf_tensor->dims->size; ++dim) {
+    arg_shape[dim] = tf_tensor->dims->data[dim];
+  }
+
+  // import the buffer
+  const iree_hal_buffer_params_t params = {
+      .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+      .access = is_write
+                    ? IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_READ
+                    : IREE_HAL_MEMORY_ACCESS_READ,
+      .queue_affinity = 0,
+  };
+  iree_hal_external_buffer_t external_buffer = {
+      .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+      .flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE,
+      .size = tf_tensor->bytes,
+      .handle.host_allocation.ptr = tf_tensor->data.data,
+  };
+  iree_hal_buffer_release_callback_t null_callback = {
+      .fn = NULL,
+      .user_data = NULL,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_allocator_import_buffer(
+      device_allocator, params, &external_buffer, null_callback, &buffer);
+
+  if (iree_status_is_ok(status)) {
+    // create a buffer view of the imported buffer
+    status = iree_hal_buffer_view_create(
+        buffer, tf_tensor->dims->size, arg_shape,
+        get_hal_elem_type(tf_tensor->type),
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, buffer_view);
+  }
+
+  if (iree_status_is_ok(status)) {
+    // The buffer view retains the buffer.
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
+}
+
+static iree_status_t add_call_arg(iree_runtime_call_t* iree_call,
+                                  int tensor_index, TfLiteContext* context,
+                                  iree_runtime_session_t* session,
+                                  bool is_write) {
+  iree_hal_buffer_view_t* arg = NULL;
+
+  iree_status_t status = import_tfl_tensor_as_iree_buffer_view(
+      tensor_index, context, session, &arg, is_write);
+  if (iree_status_is_ok(status)) {
+#ifdef PRINT_VALUES
+    iree_allocator_t host_allocator =
+        iree_runtime_session_host_allocator(session);
+    fprintf(stderr, "tensor_index %d: ", tensor_index);
+    IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(
+        stderr, arg, /*max_element_count=*/4096, host_allocator));
+#endif  // PRINT_VALUES
+    // Add to the call inputs list (which retains the buffer view).
+    status = iree_runtime_call_inputs_push_back_buffer_view(iree_call, arg);
+
+    // Since the call retains the buffer view we can release it here.
+    iree_hal_buffer_view_release(arg);
+
+#ifdef PRINT_VALUES
+    fprintf(stderr, "\n");
+#endif  // PRINT_VALUES
+  }
+  return status;
+}
+
 // Call a function from the module in the session.
 iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
                                          iree_string_view_t function_name,
@@ -89,121 +201,25 @@ iree_status_t iree_runtime_call_function(iree_runtime_session_t* session,
 
   // handle inputs
   for (int i = 0; i < node->inputs->size; ++i) {
-    iree_hal_buffer_view_t* arg = NULL;
-    const int tensor_index = node->inputs->data[i];
-
     if (iree_status_is_ok(status)) {
-      iree_hal_dim_t arg_shape[MAX_TENSOR_DIMS] = {
-          1,
-      };
-      const TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
-
-      if (tf_tensor->dims->size > MAX_TENSOR_DIMS) {
-        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "only supports up to %lu dims but got %d",
-                                sizeof(arg_shape), tf_tensor->dims->size);
-      }
-
-      for (int dim = 0; dim < tf_tensor->dims->size; ++dim) {
-        arg_shape[dim] = tf_tensor->dims->data[dim];
-      }
-
-      // import the buffer
-      const iree_hal_buffer_params_t params = {
-          .type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST |
-                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-          .access = IREE_HAL_MEMORY_ACCESS_READ,
-          .queue_affinity = 0,
-      };
-      iree_hal_external_buffer_t external_buffer = {
-          .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
-          .flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE,
-          .size = tf_tensor->bytes,
-          .handle.host_allocation.ptr = tf_tensor->data.data,
-      };
-      iree_hal_buffer_release_callback_t null_callback = {
-          .fn = NULL,
-          .user_data = NULL,
-      };
-      iree_hal_buffer_t* buffer = NULL;
-      iree_status_t status = iree_hal_allocator_import_buffer(
-          device_allocator, params, &external_buffer, null_callback, &buffer);
-
-      if (iree_status_is_ok(status)) {
-        // create a buffer view of the imported buffer
-        status = iree_hal_buffer_view_create(
-            buffer, tf_tensor->dims->size, arg_shape,
-            get_hal_elem_type(tf_tensor->type),
-            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, &arg);
-      }
-
-      if (iree_status_is_ok(status)) {
-        // The buffer view retains the buffer.
-        iree_hal_buffer_release(buffer);
-      }
+      const int tensor_index = node->inputs->data[i];
+      status = add_call_arg(&call, tensor_index, context, session,
+                            /*is_write=*/false);
     }
-    if (iree_status_is_ok(status)) {
-#ifdef PRINT_VALUES
-      fprintf(stdout, "arg %d: ", i);
-      IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(
-          stdout, arg, /*max_element_count=*/4096, host_allocator));
-#endif  // PRINT_VALUES
-      // Add to the call inputs list (which retains the buffer view).
-      status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg);
-    }
-    // Since the call retains the buffer view we can release it here.
-    iree_hal_buffer_view_release(arg);
-#ifdef PRINT_VALUES
-    fprintf(stdout, "\n");
-#endif  // PRINT_VALUES
   }
+
+  // handle outputs as function argument
+  for (int i = 0; i < node->outputs->size; ++i) {
+    if (iree_status_is_ok(status)) {
+      const int tensor_index = node->outputs->data[i];
+      status = add_call_arg(&call, tensor_index, context, session,
+                            /*is_write=*/true);
+    }
+  }
+
   // Synchronously perform the call.
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
-  }
-
-  // Process the outputs.
-  // FIXME: figure out how to output to the tf output buffer. Would need to use
-  // DPS.
-  for (int i = 0; i < node->outputs->size; ++i) {
-    iree_hal_buffer_view_t* ret_buffer_view = NULL;
-    if (iree_status_is_ok(status)) {
-      status = iree_runtime_call_outputs_pop_front_buffer_view(
-          &call, &ret_buffer_view);
-    }
-
-    if (iree_status_is_ok(status)) {
-      int tensor_index = node->outputs->data[i];
-      TfLiteTensor* tf_tensor = &context->tensors[tensor_index];
-
-      iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          iree_hal_buffer_view_buffer(ret_buffer_view),
-          IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
-          IREE_WHOLE_BUFFER, &buffer_mapping));
-      memcpy(tf_tensor->data.data, buffer_mapping.contents.data,
-             buffer_mapping.contents.data_length);
-    }
-#ifdef PRINT_VALUES
-    if (iree_status_is_ok(status)) {
-      // This prints the buffer view out but an application could read its
-      // contents, pass it to another call, etc.
-      fprintf(stdout, "out  : ");
-      status = iree_hal_buffer_view_fprint(
-          stdout, ret_buffer_view, /*max_element_count=*/4096, host_allocator);
-      fprintf(stdout, "\n");
-    }
-#endif  // PRINT_VALUES
-    if (iree_status_is_ok(status)) {
-      // The function allocates the output buffer and the buffer view, but when
-      // the buffer view gets created it increments the buffer's reference count
-      // to 2. To deallocate the buffer along with the buffer view, we need to
-      // decrement it to 1.
-      iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(ret_buffer_view);
-      iree_hal_buffer_release(buffer);
-      iree_hal_buffer_view_release(ret_buffer_view);
-    }
   }
 
   iree_runtime_call_deinitialize(&call);

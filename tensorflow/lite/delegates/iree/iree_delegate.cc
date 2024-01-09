@@ -267,6 +267,17 @@ class IreeDelegateKernel : public SimpleDelegateKernelInterface {
       }
       name += GetTypeSuffix(type);
     }
+    // The output types also appear in the function name.
+    for (int index : outputs) {
+      name += "_";
+      TfLiteTensor* tensor = &context->tensors[index];
+      TfLiteType type = tensor->type;
+      for (int i = 0; i < tensor->dims->size; ++i) {
+        name += std::to_string(tensor->dims->data[i]);
+        name += "x";
+      }
+      name += GetTypeSuffix(type);
+    }
 #else
     // Handle the type. When all the input types are the same, the type is
     // specified once in the function name. Otherwise, all types are
